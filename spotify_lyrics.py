@@ -16,6 +16,7 @@ tải lời đồng bộ từ NetEase / LRCLIB, hoặc từ thư mục lyrics/ d
 import asyncio
 import bisect
 import ctypes
+import ctypes.wintypes
 import hashlib
 import json
 import os
@@ -68,7 +69,9 @@ BG = PANEL = HOVER = TRACK_BAR = FG = FG_DIM = ACCENT = ACCENT_HOVER = ON_ACCENT
 LINE_SOLID = LINE_GLASS = LINE_FADED = []
 load_theme("dark")
 HEADER_H = 64
-GRIP = 18
+GRIP_SIZE = 18             # tay nắm góc phải dưới (px); màu tay nắm là GRIP trong theme.py
+EDGE = 7                    # bề rộng vùng mép để kéo đổi kích thước
+MIN_W, MIN_H = 300, 180
 
 
 # --------------------------------------------------------------------------- #
@@ -490,6 +493,7 @@ class LyricsWindow:
         self.last_time_text = None
         self.retries = {}           # số lần đã tự thử lại theo bài
         self.drag = None
+        self.maximized = None       # hình học trước khi phóng to (None = không phóng to)
         self.manual = None          # vị trí cuộn do người dùng lăn chuột
         self.manual_until = 0.0
         self.hover = False
@@ -533,7 +537,8 @@ class LyricsWindow:
         c.bind("<ButtonPress-1>", self.on_press)
         c.bind("<B1-Motion>", self.on_drag)
         c.bind("<ButtonRelease-1>", lambda e: self.save_config() if self.drag else None)
-        c.bind("<Double-Button-1>", lambda e: self.toggle_glass())
+        c.bind("<Double-Button-1>", self.on_double)
+        c.bind("<Motion>", self.on_motion)
         c.bind("<Button-3>", lambda e: self.menu.tk_popup(e.x_root, e.y_root))
         c.bind("<MouseWheel>", self.on_wheel)
         c.bind("<Configure>", self.on_resize)
@@ -553,14 +558,12 @@ class LyricsWindow:
         self.taskbar_var = tk.BooleanVar(value=self.cfg["taskbar_mode"])
         m.add_checkbutton(label=t("menu_taskbar"), variable=self.taskbar_var,
                           command=lambda: self.set_taskbar_mode(self.taskbar_var.get()))
-        m.add_command(label=t("menu_show_window"), command=self.show_main_window)
         m.add_checkbutton(label=t("menu_glass"), variable=self.glass_var,
                           command=lambda: self.toggle_glass(self.glass_var.get()))
         m.add_separator()
         m.add_command(label=t("menu_edit"), command=self.edit_lyrics)
         m.add_command(label=t("menu_reload"), command=self.refetch)
         m.add_command(label=t("menu_folder"), command=self.open_lyrics_dir)
-        m.add_command(label=t("menu_pin"), command=self.pin_to_taskbar)
         m.add_separator()
         m.add_command(label=t("menu_quit"), command=self.quit)
         self.menu = m
@@ -568,6 +571,9 @@ class LyricsWindow:
     def toolbar_buttons(self):
         return [
             ("close", "", t("btn_close"), self.quit),
+            ("max", "" if self.maximized else "",
+             t("btn_restore") if self.maximized else t("btn_max"), self.toggle_maximize),
+            ("min", "", t("btn_min"), self.minimize),
             ("more", "", t("btn_more"), self.menu_from_button),
             ("edit", "", t("btn_edit"), self.edit_lyrics),
             ("glass", "", t("btn_glass"), self.toggle_glass),
@@ -578,24 +584,82 @@ class LyricsWindow:
         x = self.root.winfo_rootx() + self.canvas.winfo_width() - 60
         self.menu.tk_popup(x, self.root.winfo_rooty() + 44)
 
+    def edges_at(self, x, y):
+        """Cạnh/góc dưới con trỏ: chuỗi gồm 'l','r','t','b' (rỗng = giữa cửa sổ)."""
+        if self.maximized:
+            return ""
+        w, h = self.root.winfo_width(), self.root.winfo_height()
+        e = ("l" if x < EDGE else "r" if x >= w - EDGE else "") + ("t" if y < EDGE else "b" if y >= h - EDGE else "")
+        if not e and x >= w - GRIP_SIZE and y >= h - GRIP_SIZE:  # tay nắm góc phải dưới (như cũ)
+            e = "rb"
+        return e
+
+    def on_motion(self, e):
+        if self.drag or "btn" in self.canvas.gettags("current"):
+            return
+        edges = self.edges_at(e.x, e.y)
+        cursor = {"l": "size_we", "r": "size_we", "t": "size_ns", "b": "size_ns",
+                  "lt": "size_nw_se", "rb": "size_nw_se", "rt": "size_ne_sw", "lb": "size_ne_sw"}.get(edges, "")
+        if self.canvas.cget("cursor") != cursor:
+            self.canvas.configure(cursor=cursor)
+
     def on_press(self, e):
         self.root.focus_force()
         if "btn" in self.canvas.gettags("current"):
             self.drag = None
             return
         w, h = self.root.winfo_width(), self.root.winfo_height()
-        mode = "resize" if e.x > w - GRIP and e.y > h - GRIP else "move"
-        self.drag = (mode, e.x_root, e.y_root, self.root.winfo_x(), self.root.winfo_y(), w, h)
+        edges = self.edges_at(e.x, e.y)
+        if not edges and self.maximized:  # kéo cửa sổ đang phóng to: không dời
+            self.drag = None
+            return
+        self.drag = (edges, e.x_root, e.y_root, self.root.winfo_x(), self.root.winfo_y(), w, h)
 
     def on_drag(self, e):
         if not self.drag:
             return
-        mode, x0, y0, wx, wy, w, h = self.drag
+        edges, x0, y0, wx, wy, w, h = self.drag
         dx, dy = e.x_root - x0, e.y_root - y0
-        if mode == "move":
+        if not edges:
             self.root.geometry(f"+{wx + dx}+{wy + dy}")
+            return
+        x, y, nw, nh = wx, wy, w, h
+        if "r" in edges:
+            nw = max(MIN_W, w + dx)
+        if "b" in edges:
+            nh = max(MIN_H, h + dy)
+        if "l" in edges:
+            nw = max(MIN_W, w - dx)
+            x = wx + w - nw  # giữ nguyên mép phải
+        if "t" in edges:
+            nh = max(MIN_H, h - dy)
+            y = wy + h - nh  # giữ nguyên mép dưới
+        self.root.geometry(f"{nw}x{nh}+{x}+{y}")
+
+    def on_double(self, e):
+        if "btn" in self.canvas.gettags("current"):
+            return
+        if e.y < HEADER_H:
+            self.toggle_maximize()
         else:
-            self.root.geometry(f"{max(300, w + dx)}x{max(180, h + dy)}")
+            self.toggle_glass()
+
+    def toggle_maximize(self):
+        """Phóng to bằng vùng làm việc của màn hình (trừ taskbar) / khôi phục kích thước cũ."""
+        if self.maximized:
+            self.root.geometry(self.maximized)
+            self.maximized = None
+        else:
+            self.maximized = self.root.geometry()
+            r = ctypes.wintypes.RECT()
+            ctypes.windll.user32.SystemParametersInfoW(0x30, 0, ctypes.byref(r), 0)  # SPI_GETWORKAREA
+            self.root.geometry(f"{r.right - r.left}x{r.bottom - r.top}+{r.left}+{r.top}")
+        self.root.after(80, self.relayout)  # đổi biểu tượng nút phóng to / khôi phục
+
+    def minimize(self):
+        """Thu nhỏ xuống taskbar (cửa sổ không viền nên dùng Win32); bấm biểu tượng app để mở lại."""
+        hwnd = ctypes.windll.user32.GetParent(self.root.winfo_id())
+        ctypes.windll.user32.ShowWindow(hwnd, 6)  # SW_MINIMIZE
 
     def on_wheel(self, e):
         """Lăn chuột chỉ cuộn lời; 3 giây sau tự quay về dòng đang hát."""
@@ -787,20 +851,6 @@ class LyricsWindow:
             return "♪ " + title, ""
         return "♪ " + title, self.message_text().splitlines()[0] if self.message_text() else ""
 
-    def pin_to_taskbar(self):
-        """Windows không cho app tự ghim -> nháy biểu tượng trên taskbar và hướng dẫn 2 bước."""
-        from tkinter import messagebox
-        try:
-            class FLASHWINFO(ctypes.Structure):
-                _fields_ = [("cbSize", ctypes.c_uint), ("hwnd", ctypes.c_void_p), ("dwFlags", ctypes.c_uint),
-                            ("uCount", ctypes.c_uint), ("dwTimeout", ctypes.c_uint)]
-            hwnd = ctypes.windll.user32.GetParent(self.root.winfo_id())
-            info = FLASHWINFO(ctypes.sizeof(FLASHWINFO), hwnd, 0x2, 6, 0)  # FLASHW_TRAY, 6 lần
-            ctypes.windll.user32.FlashWindowEx(ctypes.byref(info))
-        except Exception:  # noqa: BLE001
-            pass
-        messagebox.showinfo(t("pin_title"), t("pin_steps"), parent=self.root)
-
     def open_lyrics_dir(self):
         os.makedirs(LYRICS_DIR, exist_ok=True)
         os.startfile(LYRICS_DIR)
@@ -863,8 +913,13 @@ class LyricsWindow:
         self.save_job = self.root.after(800, self.save_config)
 
     def save_config(self):
-        self.cfg.update(x=self.root.winfo_x(), y=self.root.winfo_y(),
-                        w=self.root.winfo_width(), h=self.root.winfo_height())
+        if self.maximized:  # lưu kích thước bình thường, không lưu kích thước phóng to
+            size, x, y = self.maximized.split("+")[:3]
+            w, h = size.split("x")
+            self.cfg.update(x=int(x), y=int(y), w=int(w), h=int(h))
+        else:
+            self.cfg.update(x=self.root.winfo_x(), y=self.root.winfo_y(),
+                            w=self.root.winfo_width(), h=self.root.winfo_height())
         try:
             with open(CONFIG_PATH, "w", encoding="utf-8") as f:
                 json.dump(self.cfg, f, indent=2)
