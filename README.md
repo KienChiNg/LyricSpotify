@@ -4,76 +4,120 @@
 
 # Lyric Spotify 🎶
 
-Cửa sổ nổi trên màn hình Windows hiển thị **lời bài hát chạy theo nhạc** của bài đang phát trên app Spotify.
-Không cần đăng nhập hay API key. Khi không tìm thấy lời, **AI có thể tự nghe và chép lời** (tuỳ chọn, cần card NVIDIA).
+A floating Windows overlay that shows **time-synced lyrics** for the song playing in the **Spotify desktop app**.
+No Spotify login or API key needed. When no lyrics can be found, an optional **AI can listen and transcribe them** (NVIDIA GPU).
 
-*A floating Windows overlay that shows time-synced lyrics for the song playing in the Spotify desktop app. Interface in Vietnamese and English.*
+<p align="center">
+  <img src="docs/demo.gif" alt="Lyrics scrolling in sync with the music">
+</p>
 
-## Tính năng
+## Features
 
-- Lấy bài đang phát từ Windows Media Controls: không cần tài khoản lập trình viên Spotify.
-- Tìm lời chạy theo nhạc từ **NetEase Cloud Music** (nhiều nhạc Việt / châu Á) và **LRCLIB**, có lưu đệm trên máy.
-- Tự thêm hoặc sửa lời: chuột phải → *Thêm / sửa lời*, lưu thành file `.lrc` / `.txt` trong thư mục `lyrics/`.
-- **AI chép lời** (tuỳ chọn): Whisper large-v3-turbo chạy trên GPU, tách giọng hát bằng Demucs, lời hiện dần theo bài và được lưu lại khi nghe trọn bài.
-- Giao diện: dòng đang hát nằm giữa và cuộn mượt; nền trong suốt chỉ hiện chữ; chỉnh độ đậm, font, cỡ chữ; tiếng Việt / English.
+- Reads the playing track from Windows Media Controls, so no Spotify developer account is needed.
+- Synced lyrics from **NetEase Cloud Music** (great coverage of Vietnamese / Asian music) and **LRCLIB**, cached locally.
+- **Lyrics on the taskbar**: the current line (and the next one) right on the Windows taskbar, next to the clock.
+- The current line stays centered and scrolls smoothly; transparent "text only" mode; adjustable opacity, font and size.
+- **Dark / light / follow-Windows** themes; Vietnamese and English interface.
+- Add or fix lyrics yourself (right-click → *Add / edit lyrics*), saved as `.lrc` / `.txt` files.
+- **AI transcription** (optional): Whisper large-v3-turbo on the GPU with Demucs vocal separation; lyrics appear as the song plays and are saved once the whole song has been heard.
 
-## Yêu cầu
+| Lyrics window | Light theme | Settings |
+|---|---|---|
+| <img src="docs/window.png" width="260" alt="Lyrics window"> | <img src="docs/light.png" width="260" alt="Light theme"> | <img src="docs/settings.png" width="230" alt="Settings window"> |
 
-- Windows 10 / 11, app **Spotify** bản desktop
-- [Python 3.11+](https://www.python.org/downloads/) (khi cài, tick *Add python.exe to PATH*)
-- Cho AI chép lời: card **NVIDIA** (khuyên dùng từ 6 GB VRAM), dung lượng trống khoảng 6 GB
+**Lyrics on the taskbar**
 
-## Cài đặt
+<img src="docs/taskbar.png" alt="Lyrics on the Windows taskbar">
+
+## Download (no Python needed)
+
+1. Go to **[Releases](https://github.com/KienChiNg/LyricSpotify/releases)** and download `LyricSpotify-Setup-<version>.exe` (~17 MB).
+2. Run it. No administrator rights needed. You can optionally download the AI add-on during setup.
+3. Open the Spotify desktop app and play a song.
+
+> Windows may show a SmartScreen warning because the app is not code-signed yet:
+> click **More info → Run anyway** (in Edge downloads: **… → Keep → Keep anyway**).
+
+The AI add-on can also be installed later: ⚙ **Settings → AI transcription → Download AI add-on**
+(~3 GB, +~2.5 GB with vocal separation, plus a ~1.6 GB speech model). Parts that are already on the PC are not downloaded again.
+If the AI does not work, run `LyricSpotify.exe --selftest-ai`; the result is written to `~/.spotify_lyrics.log`.
+
+## Usage
+
+| Action | Result |
+|---|---|
+| Move the mouse over the window | Show buttons: ⚙ settings · 👁 transparent mode · ⋯ menu · — minimize · ☐ maximize · ✕ close |
+| Drag inside the window | Move it |
+| Drag any edge or corner | Resize it |
+| Double-click the title bar | Maximize / restore |
+| Double-click the lyrics / `T` key | Toggle the transparent background |
+| Mouse wheel | Scroll through the lyrics (returns to the current line after 3 s) |
+| `↑` `↓` | Window opacity |
+| Right-click | Menu: settings, lyrics on the taskbar, add / edit lyrics, reload, lyrics folder, quit |
+| `Esc` | Quit |
+
+**Lyrics on the taskbar**: right-click → *Lyrics on the taskbar* (or in Settings). Drag the taskbar lyrics to move them;
+click them to go back to the lyrics window.
+
+## Run from source
+
+### Requirements
+
+- Windows 10 / 11 and the **Spotify** desktop app
+- [Python 3.11+](https://www.python.org/downloads/) (tick *Add python.exe to PATH* when installing)
+- For AI transcription: an **NVIDIA** GPU (6 GB+ VRAM recommended) and ~6 GB of free disk space
+
+### Install
 
 ```bash
-git clone <địa chỉ repo này>
+git clone https://github.com/KienChiNg/LyricSpotify.git
 cd LyricSpotify
 install.bat
 ```
 
-`install.bat` cài thư viện bắt buộc, rồi hỏi bạn có muốn cài phần AI (khoảng 3 GB) và tách giọng hát Demucs (khoảng 2.5 GB) không.
-Cài tay cũng được:
+`install.bat` installs the required packages, then asks whether to install the AI part (~3 GB) and Demucs vocal separation (~2.5 GB).
+Or install manually:
 
 ```bash
-pip install -r requirements.txt          # bắt buộc
-pip install -r requirements-ai.txt       # tuỳ chọn: AI chép lời
+pip install -r requirements.txt          # required
+pip install -r requirements-ai.txt       # optional: AI transcription
 pip install torch torchaudio --index-url https://download.pytorch.org/whl/cu124
-pip install demucs                       # tuỳ chọn: tách giọng hát
+pip install demucs                       # optional: vocal separation
 ```
 
-Mô hình AI (khoảng 1.6 GB) được tải tự động ở lần đầu dùng.
+### Run
 
-## Chạy
+Double-click `run.bat`, or run `pythonw spotify_lyrics.py`.
 
-Bấm đúp `run.bat`, hoặc chạy `pythonw spotify_lyrics.py`.
+### Build the exe and installer
 
-| Thao tác | Tác dụng |
+```bash
+build.bat
+```
+
+This builds `dist\LyricSpotify.exe` with PyInstaller (AI libraries are intentionally **not** bundled; they are downloaded later)
+and then `dist\LyricSpotify-Setup-<version>.exe` with [Inno Setup](https://jrsoftware.org/isinfo.php)
+(`winget install --id JRSoftware.InnoSetup -e --scope user`).
+
+## Notes on AI transcription
+
+- Windows 10 cannot capture a single app's audio, so the AI **pauses while other apps are playing sound**.
+  To capture only Spotify: install a virtual audio cable (e.g. VB-CABLE), set Spotify's output to *CABLE Input*,
+  then select that device in *Settings → Device the AI listens to*.
+- AI lyrics can contain mistakes; fix them with *Add / edit lyrics*. Your own saved lyrics always take priority.
+
+## Data on your PC
+
+| Path | Contents |
 |---|---|
-| Rê chuột vào cửa sổ | Hiện nút: ⚙ Cài đặt · 👁 nền trong suốt · ✎ sửa lời · ⋯ menu · ✕ đóng |
-| Kéo chuột trái | Di chuyển cửa sổ (kéo góc phải dưới để đổi kích thước) |
-| Lăn chuột | Cuộn xem lời; 3 giây sau tự quay về dòng đang hát |
-| Nhấp đúp / phím `T` | Bật / tắt nền trong suốt |
-| Phím `↑` `↓` | Độ đậm cửa sổ |
-| Chuột phải | Menu |
-| `Esc` | Thoát |
+| `~/.spotify_lyrics.json` | Settings |
+| `~/.spotify_lyrics_cache/` | Lyrics downloaded from the internet |
+| `lyrics/`, `lyrics/ai/` (next to the app) | Lyrics you added / AI transcriptions |
+| `%LOCALAPPDATA%\LyricSpotify\ai-libs` | AI add-on (removed by the uninstaller) |
+| `~/.spotify_lyrics.log` | Error log |
 
-## Ghi chú về AI chép lời
+## Lyrics sources
 
-- Windows 10 không thu riêng được âm thanh của một app, nên AI **tạm dừng khi app khác đang phát tiếng**.
-  Để chỉ thu tiếng Spotify: cài cáp âm thanh ảo (vd: VB-CABLE), đặt Output của Spotify là *CABLE Input*,
-  rồi chọn thiết bị đó trong *Cài đặt → Thiết bị AI nghe*.
-- Lời do AI chép có thể sai một số chữ; bạn sửa qua *Thêm / sửa lời* và bản bạn lưu luôn được ưu tiên.
-
-## Dữ liệu trên máy
-
-| Đường dẫn | Nội dung |
-|---|---|
-| `~/.spotify_lyrics.json` | Cài đặt |
-| `~/.spotify_lyrics_cache/` | Lời đã tải từ mạng |
-| `lyrics/` , `lyrics/ai/` | Lời bạn tự thêm / lời AI chép |
-| `~/.spotify_lyrics.log` | Nhật ký lỗi |
-
-## Nguồn lời & giấy phép
-
-Lời bài hát lấy từ NetEase Cloud Music và [LRCLIB](https://lrclib.net) qua API công khai, không chính thức của NetEase.
-Lời bài hát thuộc bản quyền của tác giả; app chỉ hiển thị để dùng cá nhân.
+Lyrics come from NetEase Cloud Music and [LRCLIB](https://lrclib.net) through public (unofficial for NetEase) APIs.
+Lyrics are the property of their respective owners; the app only displays them for personal use.
+The demo images use made-up sample lyrics.
