@@ -73,4 +73,3 @@ Bấm đúp `run.bat`, hoặc chạy `pythonw spotify_lyrics.py`.
 
 Lời bài hát lấy từ NetEase Cloud Music và [LRCLIB](https://lrclib.net) qua API công khai, không chính thức của NetEase.
 Lời bài hát thuộc bản quyền của tác giả; app chỉ hiển thị để dùng cá nhân.
-Ý tưởng tìm lời từ NetEase tham khảo [mantou132/Spotify-Lyrics](https://github.com/mantou132/Spotify-Lyrics).
