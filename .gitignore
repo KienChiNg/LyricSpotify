@@ -1,0 +1,11 @@
+__pycache__/
+*.pyc
+*.log
+# lời bài hát do người dùng / AI lưu trên máy
+lyrics/
+# môi trường ảo, bản build
+.venv/
+venv/
+build/
+dist/
+*.spec

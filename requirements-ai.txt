@@ -1,0 +1,12 @@
+# Tuỳ chọn: AI nghe nhạc và tự chép lời khi không tìm thấy lời (cần card NVIDIA)
+faster-whisper
+soundcard
+numpy
+pycaw
+psutil
+nvidia-cublas-cu12
+nvidia-cudnn-cu12==9.*
+
+# Tách giọng hát (Demucs) cần PyTorch bản CUDA, cài riêng:
+#   pip install torch torchaudio --index-url https://download.pytorch.org/whl/cu124
+#   pip install demucs

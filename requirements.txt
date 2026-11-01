@@ -1,0 +1,5 @@
+# Bắt buộc: hiển thị lời, tìm lời trên mạng
+winrt-runtime
+winrt-Windows.Media.Control
+winrt-Windows.Foundation
+Pillow
