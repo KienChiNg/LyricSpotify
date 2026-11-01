@@ -29,7 +29,7 @@ No Spotify login or API key needed. When no lyrics can be found, an optional **A
 
 <img src="docs/taskbar.png" alt="Lyrics on the Windows taskbar">
 
-## Download (no Python needed)
+## Download 
 
 1. Go to **[Releases](https://github.com/KienChiNg/LyricSpotify/releases)** and download `LyricSpotify-Setup-<version>.exe` (~17 MB).
 2. Run it. No administrator rights needed. You can optionally download the AI add-on during setup.
