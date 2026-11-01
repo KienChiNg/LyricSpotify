@@ -74,6 +74,8 @@ class TaskbarLyrics:
         self.canvas.pack(fill="both", expand=True)
         self.lines = ("", "")
         self.marquee = None
+        self.content_w = None   # bề rộng vừa đủ cho chữ đang hiện
+        self.drawing = False
         self.geom = None
         self.hidden = False
         self.drag = None
@@ -103,14 +105,17 @@ class TaskbarLyrics:
             y = b - h - 60
         else:
             h = b - t
-            w = cfg["taskbar_w"]
+            # chỉ rộng vừa phần chữ (tối đa = độ rộng trong Cài đặt): phần taskbar còn lại vẫn bấm được
+            w = min(cfg["taskbar_w"], self.content_w or cfg["taskbar_w"])
             right = (notify[0] if notify else r) - 8 - cfg["taskbar_offset"]
             x, y = max(l, right - w), t
         geom = (w, h, x, y)
         if geom != self.geom:
+            resized = self.geom is None or self.geom[:2] != geom[:2]
             self.geom = geom
             self.win.geometry(f"{w}x{h}+{x}+{y}")
-            self.lines = None  # vẽ lại theo kích thước mới
+            if resized and not self.drawing:
+                self.lines = None  # vẽ lại theo kích thước mới
 
     def on_press(self, e):
         self.drag = (e.x_root, self.app.cfg["taskbar_offset"])
@@ -118,12 +123,11 @@ class TaskbarLyrics:
         self.raise_now()
 
     def on_release(self, _e):
-        if self.drag and not self.moved:
-            # bấm (không kéo) vào dải lời -> quay về giao diện bình thường của app
-            self.app.root.after(10, lambda: self.app.set_taskbar_mode(False))
-        else:
+        # bấm vào dải lời không đổi chế độ (về cửa sổ lời: chuột phải -> bỏ chọn "Lời trên thanh taskbar")
+        if self.drag and self.moved:
             self.app.save_config()
         self.drag = None
+        self.raise_now()
 
     def on_drag(self, e):
         if self.drag:
@@ -217,7 +221,7 @@ class TaskbarLyrics:
     def redraw(self, current, upcoming):
         self.lines = (current, upcoming)
         self.marquee = None
-        w, h = self.geom[0], self.geom[1]
+        h = self.geom[1]
         c = self.canvas
         c.delete("all")
         light = taskbar_is_light()
@@ -226,8 +230,17 @@ class TaskbarLyrics:
         # cỡ chữ cố định theo chiều cao taskbar, không đổi theo độ dài câu
         f1 = tkfont.Font(family=family, size=-max(11, int(h * 0.40)), weight="bold")
         f2 = tkfont.Font(family=family, size=-max(9, int(h * 0.29)), weight="normal")
-        avail = w - 2 * PAD
         two = bool(upcoming) and h >= 36
+        # thu hẹp dải vừa đúng phần chữ rồi mới vẽ
+        need = max(f1.measure(current), f2.measure(upcoming) if two else 0) + 2 * PAD + 2
+        self.content_w = max(40, need)
+        self.drawing = True
+        try:
+            self.place()
+        finally:
+            self.drawing = False
+        w = self.geom[0]
+        avail = w - 2 * PAD
         y1 = h * 0.31 if two else h / 2
         if f1.measure(current) > avail:
             item = c.create_text(PAD, y1, text=current, font=f1, fill=fg, anchor="w")

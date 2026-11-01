@@ -57,7 +57,7 @@ If the AI does not work, run `LyricSpotify.exe --selftest-ai`; the result is wri
 | `Esc` | Quit |
 
 **Lyrics on the taskbar**: right-click → *Lyrics on the taskbar* (or in Settings). Drag the taskbar lyrics to move them;
-click them to go back to the lyrics window.
+right-click them and untick *Lyrics on the taskbar* to go back to the lyrics window.
 
 ## Run from source
 

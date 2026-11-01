@@ -16,7 +16,7 @@ STRINGS = {
         "btn_restore": "Khôi phục kích thước",
         "taskbar_mode": "Hiện lời chạy trên thanh taskbar",
         "taskbar_hide_main": "Ẩn cửa sổ lời lớn khi đang hiện lời trên taskbar "
-                             "(bấm vào chữ trên taskbar để mở lại)",
+                             "(chuột phải vào lời trên taskbar → bỏ chọn «Lời trên thanh taskbar» để mở lại)",
         "taskbar_width": "Độ rộng dải lời trên taskbar (px)",
         "menu_quit": "Thoát    Esc",
         "btn_close": "Đóng",
@@ -125,7 +125,7 @@ STRINGS = {
         "btn_restore": "Restore size",
         "taskbar_mode": "Show lyrics on the taskbar",
         "taskbar_hide_main": "Hide the big lyrics window while lyrics are on the taskbar "
-                             "(click the taskbar lyrics to reopen it)",
+                             "(right-click the taskbar lyrics → untick «Lyrics on the taskbar» to reopen it)",
         "taskbar_width": "Taskbar lyrics width (px)",
         "menu_quit": "Quit    Esc",
         "btn_close": "Close",
