@@ -144,7 +144,8 @@ class TaskbarLyrics:
         self.marquee = None
         self.content_w = None
         self.bar = None         # taskbar đang đặt dải chữ (màn hình chính hoặc phụ)
-        self.peek_hwnd = None   # bề rộng vừa đủ cho chữ đang hiện
+        self.peek_hwnd = None
+        self.bars_cache = None  # (thời điểm, danh sách taskbar)   # bề rộng vừa đủ cho chữ đang hiện
         self.drawing = False
         self.geom = None
         self.hidden = False
@@ -163,8 +164,12 @@ class TaskbarLyrics:
     # ---- vị trí -------------------------------------------------------- #
 
     def current_bar(self):
-        """Taskbar của màn hình đã chọn (kéo dải chữ sang màn hình khác để đổi); không có thì taskbar chính."""
-        bars = taskbars()
+        """Taskbar của màn hình đã chọn (kéo dải chữ sang màn hình khác để đổi); không có thì taskbar chính.
+        Danh sách taskbar chỉ tìm lại mỗi giây (liệt kê cửa sổ là bước tốn nhất trong vòng 0,1 giây)."""
+        now = time.monotonic()
+        if self.bars_cache is None or now - self.bars_cache[0] > 1.0 or self.drag:
+            self.bars_cache = (now, taskbars())
+        bars = self.bars_cache[1]
         if not bars:
             return None
         want = self.app.cfg.get("taskbar_monitor") or ""

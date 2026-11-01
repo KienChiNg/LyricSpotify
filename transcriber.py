@@ -20,10 +20,19 @@ import ai_runtime
 
 ai_runtime.activate()  # thư viện AI tải thêm sau khi cài app (bản exe)
 
-try:  # chỉ cần cho AI; app vẫn chạy khi chưa cài phần AI
-    import numpy as np
-except ImportError:
-    np = None
+# numpy chỉ nạp khi AI thật sự chạy (không nạp lúc mở app): OpenBLAS của numpy giữ sẵn
+# bộ nhớ đệm cho từng luồng CPU, làm app "đăng ký" thêm vài trăm MB dù chưa dùng tới AI.
+os.environ.setdefault("OPENBLAS_NUM_THREADS", "1")
+os.environ.setdefault("OMP_NUM_THREADS", "1")
+np = None
+
+
+def _load_numpy():
+    global np
+    if np is None:
+        import numpy
+        np = numpy
+    return np
 
 SR = 16000
 MODELS = ["small", "medium", "large-v3-turbo"]  # chữ hiển thị nằm trong i18n.py
@@ -63,7 +72,7 @@ def output_devices():
 def available():
     import importlib.util
     try:
-        return np is not None and all(importlib.util.find_spec(m) for m in ("faster_whisper", "soundcard"))
+        return all(importlib.util.find_spec(m) for m in ("numpy", "faster_whisper", "soundcard"))
     except (ImportError, ValueError):
         return False
 
@@ -299,6 +308,7 @@ class Transcriber:
 
     def __init__(self, state, track_key, model_name, lang, on_line, on_status,
                  only_spotify=True, device="", separate=True):
+        _load_numpy()
         self.state, self.key = state, track_key
         self.device = device  # "" = loa mặc định; tên khác = thiết bị riêng chỉ có tiếng Spotify
         self.only_spotify = only_spotify and not device
