@@ -502,6 +502,7 @@ class LyricsWindow:
         self.ai_status = None       # (key i18n, tham số)
         self.settings_win = None
         self.taskbar = None         # dải lời trên thanh taskbar
+        self.peek_hwnd = None
         self.hide_job = None
         self.toast_job = None
         self.size = (self.cfg["w"], self.cfg["h"])
@@ -530,6 +531,10 @@ class LyricsWindow:
                 return
             user32 = ctypes.windll.user32
             hwnd = user32.GetParent(self.root.winfo_id())
+            if hwnd != self.peek_hwnd:  # cửa sổ lời cũng không bị Aero Peek làm ẩn
+                from taskbar_lyrics import exclude_from_peek
+                exclude_from_peek(hwnd)
+                self.peek_hwnd = hwnd
             ex = user32.GetWindowLongW(hwnd, -20)  # GWL_EXSTYLE
             want = (ex & ~0x80) | 0x40000          # bỏ TOOLWINDOW, thêm APPWINDOW
             if ex != want:

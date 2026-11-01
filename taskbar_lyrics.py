@@ -84,6 +84,18 @@ def taskbar_info():
     return _rect(tray), (_rect(notify) if notify else None)
 
 
+def exclude_from_peek(hwnd):
+    """Giữ cửa sổ hiện khi Aero Peek (rê/giữ chuột trên ảnh xem trước của app khác ở taskbar
+    làm mờ mọi cửa sổ khác, kể cả cửa sổ luôn trên cùng)."""
+    if not hwnd:
+        return
+    try:
+        on = ctypes.c_int(1)
+        ctypes.windll.dwmapi.DwmSetWindowAttribute(W.HWND(hwnd), 12, ctypes.byref(on), 4)  # DWMWA_EXCLUDED_FROM_PEEK
+    except Exception:  # noqa: BLE001
+        pass
+
+
 def taskbar_is_light():
     try:
         import winreg
@@ -121,7 +133,8 @@ class TaskbarLyrics:
         self.lines = ("", "")
         self.marquee = None
         self.content_w = None
-        self.bar = None         # taskbar đang đặt dải chữ (màn hình chính hoặc phụ)   # bề rộng vừa đủ cho chữ đang hiện
+        self.bar = None         # taskbar đang đặt dải chữ (màn hình chính hoặc phụ)
+        self.peek_hwnd = None   # bề rộng vừa đủ cho chữ đang hiện
         self.drawing = False
         self.geom = None
         self.hidden = False
@@ -257,6 +270,9 @@ class TaskbarLyrics:
 
     def raise_now(self):
         hwnd = user32.GetParent(self.win.winfo_id())
+        if hwnd != self.peek_hwnd:  # cửa sổ mới (Tk có thể tạo lại) -> gắn lại cờ chống Aero Peek
+            exclude_from_peek(hwnd)
+            self.peek_hwnd = hwnd
         self.own_by_taskbar(hwnd)
         user32.SetWindowPos(hwnd, HWND_TOPMOST, 0, 0, 0, 0, SWP_FLAGS)
 
