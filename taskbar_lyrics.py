@@ -84,6 +84,16 @@ def taskbar_info():
     return _rect(tray), (_rect(notify) if notify else None)
 
 
+def covered_by(hwnd, other):
+    """`other` đang nằm phía trên `hwnd` trong thứ tự cửa sổ (che nó)?"""
+    h, n = user32.GetWindow(hwnd, 3), 0  # GW_HWNDPREV: cửa sổ ngay phía trên
+    while h and n < 1000:
+        if h == other:
+            return True
+        h, n = user32.GetWindow(h, 3), n + 1
+    return False
+
+
 def exclude_from_peek(hwnd):
     """Giữ cửa sổ hiện khi Aero Peek (rê/giữ chuột trên ảnh xem trước của app khác ở taskbar
     làm mờ mọi cửa sổ khác, kể cả cửa sổ luôn trên cùng)."""
@@ -287,6 +297,11 @@ class TaskbarLyrics:
             self.peek_hwnd = hwnd
         self.own_by_taskbar(hwnd)
         user32.SetWindowPos(hwnd, HWND_TOPMOST, 0, 0, 0, 0, SWP_FLAGS)
+        # Sau khi rê/giữ chuột trên biểu tượng app (ảnh xem trước), Explorer đẩy taskbar lên lớp cao hơn
+        # và lệnh trên không còn tác dụng -> đặt taskbar xuống ngay dưới dải chữ.
+        bar = self.bar["hwnd"] if self.bar else None
+        if bar and covered_by(hwnd, bar):
+            user32.SetWindowPos(bar, hwnd, 0, 0, 0, 0, SWP_FLAGS)
 
     def own_by_taskbar(self, hwnd):
         """Cho dải lời "thuộc về" thanh taskbar: Windows luôn đặt cửa sổ con phía trên cửa sổ cha,
