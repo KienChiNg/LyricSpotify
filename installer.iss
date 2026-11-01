@@ -8,7 +8,6 @@
 #define AppURL "https://github.com/KienChiNg/LyricSpotify"
 
 [Setup]
-InfoAfterFile=installer\after-install.txt
 #ifdef TestBuild
 AppId={{6C1F7F2E-0000-0000-0000-7E57B0117E57}
 #else
