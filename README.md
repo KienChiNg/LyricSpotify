@@ -1,4 +1,4 @@
-# Lyric Spotify
+# Lyric Spotify 🎶
 
 Cửa sổ nổi trên màn hình Windows hiển thị **lời bài hát chạy theo nhạc** của bài đang phát trên app Spotify.
 Không cần đăng nhập hay API key. Khi không tìm thấy lời, **AI có thể tự nghe và chép lời** (tuỳ chọn, cần card NVIDIA).
