@@ -70,7 +70,7 @@ LINE_SOLID = LINE_GLASS = LINE_FADED = []
 load_theme("dark")
 HEADER_H = 64
 GRIP_SIZE = 18             # tay nắm góc phải dưới (px); màu tay nắm là GRIP trong theme.py
-EDGE = 7                    # bề rộng vùng mép để kéo đổi kích thước
+EDGE = 10                   # bề rộng vùng mép để kéo đổi kích thước
 MIN_W, MIN_H = 300, 180
 
 
@@ -512,6 +512,7 @@ class LyricsWindow:
         self.relayout()
         self.root.after(80, self.show_in_taskbar)
         self.root.after(3000, self.watch_windows_theme)
+        self.root.after(500, self.watch_pointer)
         if self.cfg["taskbar_mode"]:
             self.root.after(300, lambda: self.set_taskbar_mode(True, save=False))
         self.tick()
@@ -536,7 +537,7 @@ class LyricsWindow:
         c = self.canvas
         c.bind("<ButtonPress-1>", self.on_press)
         c.bind("<B1-Motion>", self.on_drag)
-        c.bind("<ButtonRelease-1>", lambda e: self.save_config() if self.drag else None)
+        c.bind("<ButtonRelease-1>", self.on_release)
         c.bind("<Double-Button-1>", self.on_double)
         c.bind("<Motion>", self.on_motion)
         c.bind("<Button-3>", lambda e: self.menu.tk_popup(e.x_root, e.y_root))
@@ -594,14 +595,33 @@ class LyricsWindow:
             e = "rb"
         return e
 
-    def on_motion(self, e):
-        if self.drag or "btn" in self.canvas.gettags("current"):
-            return
-        edges = self.edges_at(e.x, e.y)
-        cursor = {"l": "size_we", "r": "size_we", "t": "size_ns", "b": "size_ns",
-                  "lt": "size_nw_se", "rb": "size_nw_se", "rt": "size_ne_sw", "lb": "size_ne_sw"}.get(edges, "")
+    EDGE_CURSORS = {"l": "size_we", "r": "size_we", "t": "size_ns", "b": "size_ns",
+                    "lt": "size_nw_se", "rb": "size_nw_se", "rt": "size_ne_sw", "lb": "size_ne_sw"}
+
+    def set_cursor(self, cursor):
         if self.canvas.cget("cursor") != cursor:
             self.canvas.configure(cursor=cursor)
+
+    def on_motion(self, e):
+        """Rê chuột tới mép cửa sổ -> con trỏ mũi tên co giãn."""
+        if self.drag or "btn" in self.canvas.gettags("current"):
+            return
+        self.set_cursor(self.EDGE_CURSORS.get(self.edges_at(e.x, e.y), ""))
+
+    def watch_pointer(self):
+        """Chuột ở bất kỳ đâu trong khung cửa sổ (kể cả vùng nền trong suốt vốn không nhận chuột)
+        -> hiện nền + nút + nhận kéo ở mép; rời khung -> ẩn như cũ."""
+        try:
+            if self.root.state() == "normal":
+                x, y = self.root.winfo_pointerxy()
+                rx, ry = self.root.winfo_rootx(), self.root.winfo_rooty()
+                inside = rx <= x < rx + self.root.winfo_width() and ry <= y < ry + self.root.winfo_height()
+                if inside and not self.hover:
+                    self.on_enter(None)
+                elif not inside and self.hover and not self.hide_job and not self.drag:
+                    self.on_leave(None)
+        finally:
+            self.root.after(80, self.watch_pointer)
 
     def on_press(self, e):
         self.root.focus_force()
@@ -614,6 +634,13 @@ class LyricsWindow:
             self.drag = None
             return
         self.drag = (edges, e.x_root, e.y_root, self.root.winfo_x(), self.root.winfo_y(), w, h)
+        self.set_cursor(self.EDGE_CURSORS.get(edges, ""))  # giữ mũi tên co giãn suốt lúc kéo
+
+    def on_release(self, e):
+        if self.drag:
+            self.save_config()
+        self.drag = None
+        self.on_motion(e)  # con trỏ trở lại theo vị trí hiện tại
 
     def on_drag(self, e):
         if not self.drag:
