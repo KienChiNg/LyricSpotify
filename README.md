@@ -1,3 +1,4 @@
+<img width="1254" height="1254" alt="Neon Spotify Lyrics Icon" src="https://github.com/user-attachments/assets/7437bd02-8591-4c95-a9a0-690ddf8e3878" />
 # Lyric Spotify 🎶
 
 Cửa sổ nổi trên màn hình Windows hiển thị **lời bài hát chạy theo nhạc** của bài đang phát trên app Spotify.
