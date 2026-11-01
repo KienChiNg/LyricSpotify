@@ -47,7 +47,7 @@ DEFAULTS = {"x": 120, "y": 120, "w": 520, "h": 400, "font": 17,
             "ai_enabled": True, "ai_model": "large-v3-turbo",
             "ai_device": "", "ai_only_spotify": True, "ai_separate": True, "ui_lang": "vi",
             "theme": "dark", "taskbar_mode": False, "taskbar_hide_main": True,
-            "taskbar_w": 460, "taskbar_offset": 0}
+            "taskbar_w": 460, "taskbar_offset": 0, "taskbar_monitor": ""}
 APP_DIR = getattr(sys, "_MEIPASS", os.path.dirname(os.path.abspath(__file__)))  # tài nguyên (icon)
 # dữ liệu của người dùng (thư mục lời): cạnh file exe khi chạy bản đóng gói
 DATA_DIR = os.path.dirname(sys.executable) if getattr(sys, "frozen", False) else os.path.dirname(os.path.abspath(__file__))

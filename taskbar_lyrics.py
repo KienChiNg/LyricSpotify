@@ -30,6 +30,51 @@ def _rect(hwnd):
     return r.left, r.top, r.right, r.bottom
 
 
+class MONITORINFOEX(ctypes.Structure):
+    _fields_ = [("cbSize", W.DWORD), ("rcMonitor", W.RECT), ("rcWork", W.RECT),
+                ("dwFlags", W.DWORD), ("szDevice", W.WCHAR * 32)]
+
+
+def monitor_at(x, y):
+    """-> (tên màn hình, rect màn hình) tại điểm (x, y)."""
+    hmon = user32.MonitorFromPoint(W.POINT(int(x), int(y)), 2)  # MONITOR_DEFAULTTONEAREST
+    mi = MONITORINFOEX()
+    mi.cbSize = ctypes.sizeof(MONITORINFOEX)
+    user32.GetMonitorInfoW(hmon, ctypes.byref(mi))
+    m = mi.rcMonitor
+    return mi.szDevice, (m.left, m.top, m.right, m.bottom)
+
+
+def taskbars():
+    """Tất cả thanh taskbar đang hiện: taskbar chính và taskbar của các màn hình phụ.
+    -> list dict(hwnd, rect, right_ref, device, monitor, primary)."""
+    found = []
+
+    @ctypes.WINFUNCTYPE(ctypes.c_bool, W.HWND, W.LPARAM)
+    def cb(hwnd, _):
+        cls = ctypes.create_unicode_buffer(64)
+        user32.GetClassNameW(hwnd, cls, 64)
+        if cls.value in ("Shell_TrayWnd", "Shell_SecondaryTrayWnd") and user32.IsWindowVisible(hwnd):
+            found.append((hwnd, cls.value == "Shell_TrayWnd"))
+        return True
+
+    user32.EnumWindows(cb, 0)
+    bars = []
+    for hwnd, primary in found:
+        l, t, r, b = _rect(hwnd)
+        # mép phải để canh dải chữ: khu đồng hồ/khay hệ thống (taskbar chính), đồng hồ (nếu có) hoặc mép taskbar
+        ref = r
+        for child in ("TrayNotifyWnd", "ClockButton"):
+            c = user32.FindWindowExW(hwnd, None, child, None)
+            if c:
+                ref = _rect(c)[0]
+                break
+        device, mon = monitor_at((l + r) // 2, (t + b) // 2)
+        bars.append({"hwnd": hwnd, "rect": (l, t, r, b), "right_ref": ref, "device": device,
+                     "monitor": mon, "primary": primary})
+    return bars
+
+
 def taskbar_info():
     """-> (rect taskbar, rect khu đồng hồ/khay hệ thống) hoặc None."""
     tray = user32.FindWindowW("Shell_TrayWnd", None)
@@ -49,8 +94,8 @@ def taskbar_is_light():
         return False
 
 
-def fullscreen_app_active():
-    """Có app toàn màn hình (phim, game) đang ở phía trước -> taskbar bị che, ẩn dải chữ."""
+def fullscreen_app_active(monitor=None):
+    """Có app toàn màn hình (phim, game) đang ở phía trước TRÊN màn hình của dải chữ -> ẩn dải chữ."""
     fg = user32.GetForegroundWindow()
     if not fg or fg in (user32.GetDesktopWindow(), user32.GetShellWindow()):
         return False
@@ -59,7 +104,8 @@ def fullscreen_app_active():
     if cls.value in ("Progman", "WorkerW", "Shell_TrayWnd"):
         return False
     l, t, r, b = _rect(fg)
-    return l <= 0 and t <= 0 and r >= user32.GetSystemMetrics(0) and b >= user32.GetSystemMetrics(1)
+    ml, mt, mr, mb = monitor or (0, 0, user32.GetSystemMetrics(0), user32.GetSystemMetrics(1))
+    return l <= ml and t <= mt and r >= mr and b >= mb
 
 
 class TaskbarLyrics:
@@ -74,7 +120,8 @@ class TaskbarLyrics:
         self.canvas.pack(fill="both", expand=True)
         self.lines = ("", "")
         self.marquee = None
-        self.content_w = None   # bề rộng vừa đủ cho chữ đang hiện
+        self.content_w = None
+        self.bar = None         # taskbar đang đặt dải chữ (màn hình chính hoặc phụ)   # bề rộng vừa đủ cho chữ đang hiện
         self.drawing = False
         self.geom = None
         self.hidden = False
@@ -92,11 +139,21 @@ class TaskbarLyrics:
 
     # ---- vị trí -------------------------------------------------------- #
 
+    def current_bar(self):
+        """Taskbar của màn hình đã chọn (kéo dải chữ sang màn hình khác để đổi); không có thì taskbar chính."""
+        bars = taskbars()
+        if not bars:
+            return None
+        want = self.app.cfg.get("taskbar_monitor") or ""
+        return (next((b for b in bars if b["device"] == want), None)
+                or next((b for b in bars if b["primary"]), bars[0]))
+
     def place(self):
-        info = taskbar_info()
-        if not info:
+        bar = self.current_bar()
+        if not bar:
             return
-        (l, t, r, b), notify = info
+        self.bar = bar
+        (l, t, r, b), notify = bar["rect"], (bar["right_ref"], 0, 0, 0)
         cfg = self.app.cfg
         horizontal = (r - l) >= (b - t)
         if not horizontal:  # taskbar dựng đứng: đặt dải chữ sát cạnh taskbar, gần đáy màn hình
@@ -136,6 +193,19 @@ class TaskbarLyrics:
                 self.moved = True
             if not self.moved:
                 return
+            # kéo sang màn hình khác -> nhảy sang taskbar của màn hình đó, nằm ngay dưới con trỏ
+            device, _mon = monitor_at(e.x_root, e.y_root)
+            if self.bar and device != self.bar["device"]:
+                target = next((b for b in taskbars() if b["device"] == device), None)
+                if target:
+                    w = self.geom[0] if self.geom else 200
+                    off = max(0, target["right_ref"] - 8 - (e.x_root + w // 2))
+                    self.app.cfg["taskbar_monitor"] = device
+                    self.app.cfg["taskbar_offset"] = off
+                    self.drag = (e.x_root, off)
+                    self.place()
+                    self.match_taskbar_color()
+                    return
             self.app.cfg["taskbar_offset"] = max(0, off0 - (e.x_root - x0))
             self.place()
 
@@ -143,7 +213,7 @@ class TaskbarLyrics:
         """Bấm vào taskbar sẽ đưa taskbar lên trên -> đẩy dải chữ lên lại; ẩn khi có app toàn màn hình."""
         if not self.win.winfo_exists():
             return
-        full = fullscreen_app_active()
+        full = fullscreen_app_active(self.bar["monitor"] if self.bar else None)
         if full and not self.hidden:
             self.win.withdraw()
             self.hidden = True
@@ -193,7 +263,7 @@ class TaskbarLyrics:
     def own_by_taskbar(self, hwnd):
         """Cho dải lời "thuộc về" thanh taskbar: Windows luôn đặt cửa sổ con phía trên cửa sổ cha,
         nên bấm vào taskbar (taskbar trồi lên) thì dải lời vẫn nằm trên ngay, không bị che."""
-        tray = user32.FindWindowW("Shell_TrayWnd", None)
+        tray = self.bar["hwnd"] if self.bar else user32.FindWindowW("Shell_TrayWnd", None)
         if tray and user32.GetWindowLongPtrW(hwnd, -8) != tray:  # GWLP_HWNDPARENT = cửa sổ sở hữu
             user32.SetWindowLongPtrW(hwnd, -8, tray)
 
