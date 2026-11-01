@@ -7,11 +7,13 @@ Windows không cho nhúng cửa sổ vào taskbar một cách chính thức, nê
 
 import ctypes
 import ctypes.wintypes as W
+import time
 import tkinter as tk
 from tkinter import font as tkfont
 
 user32 = ctypes.windll.user32
 KEY = "#010203"
+PAD = 6
 HWND_TOPMOST = -1
 SWP_FLAGS = 0x0001 | 0x0002 | 0x0010  # NOSIZE | NOMOVE | NOACTIVATE
 
@@ -65,6 +67,7 @@ class TaskbarLyrics:
         self.canvas = tk.Canvas(self.win, bg=KEY, highlightthickness=0)
         self.canvas.pack(fill="both", expand=True)
         self.lines = ("", "")
+        self.marquee = None
         self.geom = None
         self.hidden = False
         self.drag = None
@@ -129,37 +132,48 @@ class TaskbarLyrics:
 
     # ---- vẽ ------------------------------------------------------------ #
 
-    def fit(self, text, family, px, weight, width, min_px):
-        """Thu nhỏ chữ cho vừa bề ngang; nhỏ nhất vẫn dài thì cắt bớt '…'."""
-        while px > min_px and tkfont.Font(family=family, size=-px, weight=weight).measure(text) > width:
-            px -= 1
-        f = tkfont.Font(family=family, size=-px, weight=weight)
-        if f.measure(text) > width:
-            while text and f.measure(text + "…") > width:
-                text = text[:-1]
-            text = text.rstrip() + "…"
-        return text, (family, -px, weight)
+    def ellipsis(self, text, font, width):
+        """Cắt bớt '…' cho vừa bề ngang (giữ nguyên cỡ chữ)."""
+        if font.measure(text) <= width:
+            return text
+        while text and font.measure(text + "…") > width:
+            text = text[:-1]
+        return text.rstrip() + "…"
 
     def update(self, current, upcoming):
-        if (current, upcoming) == self.lines or not self.geom:
+        """Gọi mỗi khung hình. Cỡ chữ luôn cố định; câu dài thì chạy chữ ngang thay vì thu nhỏ."""
+        if not self.geom:
             return
+        if (current, upcoming) != self.lines:
+            self.redraw(current, upcoming)
+        if self.marquee:  # câu dài: đứng yên 1 giây ở đầu câu rồi trượt dần sang trái tới hết câu
+            item, y, overflow, t0 = self.marquee
+            offset = min(max(time.monotonic() - t0 - 1.0, 0.0) * 45, overflow)
+            self.canvas.coords(item, PAD - round(offset), y)
+
+    def redraw(self, current, upcoming):
         self.lines = (current, upcoming)
+        self.marquee = None
         w, h = self.geom[0], self.geom[1]
         c = self.canvas
         c.delete("all")
         light = taskbar_is_light()
         fg, dim = ("#000000", "#4a4a4a") if light else ("#ffffff", "#b4b4b4")
         family = self.app.cfg["font_family"]
-        pad = 6
+        # cỡ chữ cố định theo chiều cao taskbar, không đổi theo độ dài câu
+        f1 = tkfont.Font(family=family, size=-max(11, int(h * 0.40)), weight="bold")
+        f2 = tkfont.Font(family=family, size=-max(9, int(h * 0.29)), weight="normal")
+        avail = w - 2 * PAD
         two = bool(upcoming) and h >= 36
-        if two:
-            t1, f1 = self.fit(current, family, int(h * 0.40), "bold", w - 2 * pad, 10)
-            t2, f2 = self.fit(upcoming, family, int(h * 0.30), "normal", w - 2 * pad, 9)
-            c.create_text(w - pad, h * 0.30, text=t1, font=f1, fill=fg, anchor="e")
-            c.create_text(w - pad, h * 0.74, text=t2, font=f2, fill=dim, anchor="e")
+        y1 = h * 0.31 if two else h / 2
+        if f1.measure(current) > avail:
+            item = c.create_text(PAD, y1, text=current, font=f1, fill=fg, anchor="w")
+            self.marquee = (item, y1, f1.measure(current) - avail, time.monotonic())
         else:
-            t1, f1 = self.fit(current, family, int(h * 0.42), "bold", w - 2 * pad, 10)
-            c.create_text(w - pad, h / 2, text=t1, font=f1, fill=fg, anchor="e")
+            c.create_text(w - PAD, y1, text=current, font=f1, fill=fg, anchor="e")
+        if two:
+            c.create_text(w - PAD, h * 0.75, text=self.ellipsis(upcoming, f2, avail), font=f2,
+                          fill=dim, anchor="e")
 
     def destroy(self):
         if self.win.winfo_exists():

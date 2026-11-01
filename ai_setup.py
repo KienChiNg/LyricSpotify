@@ -17,6 +17,17 @@ from i18n import set_lang, t
 MODEL_REPO = "mobiuslabsgmbh/faster-whisper-large-v3-turbo"
 
 
+def model_cached():
+    """Mô hình mặc định đã có trong bộ nhớ đệm Hugging Face chưa (không cần import thư viện)."""
+    import glob
+    import os
+    hub = (os.environ.get("HF_HUB_CACHE")
+           or os.path.join(os.environ.get("HF_HOME") or os.path.join(os.path.expanduser("~"), ".cache",
+                                                                      "huggingface"), "hub"))
+    folder = os.path.join(hub, "models--" + MODEL_REPO.replace("/", "--"), "snapshots", "*", "model.bin")
+    return bool(glob.glob(folder))
+
+
 def prefetch_model(progress):
     """Tải sẵn mô hình Whisper mặc định (~1.6 GB) vào bộ nhớ đệm Hugging Face."""
     ai_runtime.activate()
@@ -27,6 +38,11 @@ def prefetch_model(progress):
 
 
 def run(cfg, with_demucs):
+    # máy đã có phần nào thì bỏ qua phần đó; đủ hết thì không cần mở cửa sổ tải
+    need_libs = not ai_runtime.installed() or (with_demucs and not ai_runtime.demucs_installed())
+    need_model = not model_cached()
+    if not need_libs and not need_model:
+        return 0
     set_lang(cfg.get("ui_lang", "vi"))
     c = theme.colors(cfg.get("theme", "dark"))
     root = tk.Tk()
@@ -74,8 +90,8 @@ def run(cfg, with_demucs):
 
     def work():
         try:
-            ok = ai_runtime.install(with_demucs, progress)
-            if ok:
+            ok = ai_runtime.install(with_demucs, progress) if need_libs else True
+            if ok and need_model:
                 try:
                     prefetch_model(progress)
                 except Exception:  # noqa: BLE001 - mô hình sẽ tự tải khi dùng lần đầu

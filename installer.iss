@@ -52,8 +52,9 @@ english.AiStatus=Downloading the AI transcription add-on (may take a while)...
 [Tasks]
 Name: "desktopicon"; Description: "{cm:CreateDesktopIcon}"; GroupDescription: "{cm:AdditionalIcons}"
 Name: "startup"; Description: "{cm:StartupTask}"; GroupDescription: "{cm:AdditionalIcons}"; Flags: unchecked
-Name: "ai"; Description: "{cm:AiTask}"; GroupDescription: "{cm:AiGroup}"; Flags: unchecked
-Name: "ai\demucs"; Description: "{cm:DemucsTask}"; GroupDescription: "{cm:AiGroup}"; Flags: unchecked
+; chỉ hiện ô tải khi máy chưa có phần đó (vd: cài bản mới đè lên bản cũ thì không tải lại)
+Name: "ai"; Description: "{cm:AiTask}"; GroupDescription: "{cm:AiGroup}"; Flags: unchecked; Check: not AiInstalled
+Name: "demucs"; Description: "{cm:DemucsTask}"; GroupDescription: "{cm:AiGroup}"; Flags: unchecked; Check: not DemucsInstalled
 
 [Files]
 Source: "dist\{#AppExe}"; DestDir: "{app}"; Flags: ignoreversion
@@ -72,8 +73,8 @@ Name: "{userstartup}\{#AppName}"; Filename: "{app}\{#AppExe}"; AppUserModelID: "
 
 [Run]
 ; tải phần AI ngay trong lúc cài (cửa sổ tiến trình riêng của app), nếu người dùng chọn
-Filename: "{app}\{#AppExe}"; Parameters: "--install-ai --lang={language}"; StatusMsg: "{cm:AiStatus}"; Tasks: ai and not ai\demucs; Flags: waituntilterminated
-Filename: "{app}\{#AppExe}"; Parameters: "--install-ai --demucs --lang={language}"; StatusMsg: "{cm:AiStatus}"; Tasks: ai\demucs; Flags: waituntilterminated
+Filename: "{app}\{#AppExe}"; Parameters: "--install-ai --lang={language}"; StatusMsg: "{cm:AiStatus}"; Tasks: ai and not demucs; Flags: waituntilterminated
+Filename: "{app}\{#AppExe}"; Parameters: "--install-ai --demucs --lang={language}"; StatusMsg: "{cm:AiStatus}"; Tasks: demucs; Flags: waituntilterminated
 Filename: "{app}\{#AppExe}"; Parameters: "--lang={language}"; Description: "{cm:LaunchProgram,{#AppName}}"; Flags: nowait postinstall skipifsilent
 
 [UninstallRun]
@@ -83,3 +84,19 @@ Filename: "{sys}\taskkill.exe"; Parameters: "/F /IM {#AppExe}"; Flags: runhidden
 [UninstallDelete]
 ; phần AI tải thêm (vài GB) và công cụ tải nằm ngoài thư mục cài -> xoá cùng khi gỡ
 Type: filesandordirs; Name: "{localappdata}\LyricSpotify"
+
+[Code]
+function AiLibs(): String;
+begin
+  Result := ExpandConstant('{localappdata}\LyricSpotify\ai-libs');
+end;
+
+function AiInstalled(): Boolean;
+begin
+  Result := DirExists(AiLibs() + '\faster_whisper');
+end;
+
+function DemucsInstalled(): Boolean;
+begin
+  Result := DirExists(AiLibs() + '\demucs') and DirExists(AiLibs() + '\torch');
+end;
