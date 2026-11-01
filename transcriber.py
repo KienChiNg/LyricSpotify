@@ -16,6 +16,10 @@ import threading
 import time
 import unicodedata
 
+import ai_runtime
+
+ai_runtime.activate()  # thư viện AI tải thêm sau khi cài app (bản exe)
+
 try:  # chỉ cần cho AI; app vẫn chạy khi chưa cài phần AI
     import numpy as np
 except ImportError:

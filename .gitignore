@@ -8,4 +8,3 @@ lyrics/
 venv/
 build/
 dist/
-*.spec

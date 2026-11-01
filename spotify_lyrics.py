@@ -21,6 +21,7 @@ import json
 import os
 import queue
 import re
+import sys
 import threading
 import time
 import tkinter as tk
@@ -30,6 +31,7 @@ import urllib.parse
 import urllib.request
 from datetime import datetime, timezone
 
+import theme
 import transcriber
 from i18n import set_lang, t
 from winrt.windows.media.control import (
@@ -42,21 +44,26 @@ DEFAULTS = {"x": 120, "y": 120, "w": 520, "h": 400, "font": 17,
             "alpha": 0.92, "glass": False,
             "font_family": "Segoe UI", "bold": False,
             "ai_enabled": True, "ai_model": "large-v3-turbo",
-            "ai_device": "", "ai_only_spotify": True, "ai_separate": True, "ui_lang": "vi"}
-APP_DIR = os.path.dirname(os.path.abspath(__file__))
+            "ai_device": "", "ai_only_spotify": True, "ai_separate": True, "ui_lang": "vi",
+            "theme": "dark"}
+APP_DIR = getattr(sys, "_MEIPASS", os.path.dirname(os.path.abspath(__file__)))  # tài nguyên (icon)
+# dữ liệu của người dùng (thư mục lời): cạnh file exe khi chạy bản đóng gói
+DATA_DIR = os.path.dirname(sys.executable) if getattr(sys, "frozen", False) else os.path.dirname(os.path.abspath(__file__))
 
 FONT = "Segoe UI"
 ICON_FONT = "Segoe MDL2 Assets"
-BG = "#121212"
-PANEL = "#262626"
-TRACK_BAR = "#2a2a2a"
-FG = "#ffffff"
-FG_DIM = "#a7a7a7"
-ACCENT = "#1ed760"
-KEY = "#010203"  # màu "trong suốt" ở chế độ nền trong suốt
-# màu dòng lời theo khoảng cách tới dòng đang hát (0 = đang hát)
-LINE_SOLID = ["#ffffff", "#b3b3b3", "#7c7c7c", "#5c5c5c", "#454545"]
-LINE_GLASS = ["#ffffff", "#e8e8e8", "#d2d2d2", "#bcbcbc", "#a8a8a8"]
+THEME_KEYS = ("BG", "PANEL", "HOVER", "TRACK_BAR", "FG", "FG_DIM", "ACCENT", "ACCENT_HOVER", "ON_ACCENT",
+              "SELECT", "GRIP", "KEY", "LINE_SOLID", "LINE_GLASS", "LINE_FADED")
+
+
+def load_theme(choice):
+    """Nạp bảng màu (tối / sáng / theo Windows) vào các hằng màu của module."""
+    globals().update({k: theme.colors(choice)[k] for k in THEME_KEYS})
+
+
+BG = PANEL = HOVER = TRACK_BAR = FG = FG_DIM = ACCENT = ACCENT_HOVER = ON_ACCENT = SELECT = GRIP = KEY = ""
+LINE_SOLID = LINE_GLASS = LINE_FADED = []
+load_theme("dark")
 HEADER_H = 64
 GRIP = 18
 
@@ -74,13 +81,22 @@ class PlayerState:
         self.playing = False
         self.error = None
 
-    def update(self, track, pos, playing):
+    def update(self, track, pos, playing, fresh=True):
+        """pos: vị trí Spotify báo (đã cộng thời gian kể từ lần cập nhật);
+        fresh: Spotify vừa gửi mốc vị trí mới (khoảng mỗi 4.5 giây, khi tua, dừng/phát)."""
         with self.lock:
             now = time.monotonic()
-            if playing and self.playing and track == self.track:
-                predicted = self.pos + (now - self.stamp)
-                if abs(pos - predicted) < 0.5:  # sai số đo nhỏ -> giữ đồng hồ đang chạy mượt
-                    pos = predicted
+            current = self.pos + (now - self.stamp if self.playing else 0.0)
+            same_song = (track and self.track and
+                         (track["title"], track["artist"]) == (self.track["title"], self.track["artist"]))
+            if not same_song:
+                # Đổi bài: Spotify thường báo tên bài mới trước, vị trí vẫn của bài cũ ->
+                # chỉ tin vị trí nếu là mốc mới vừa gửi, không thì đếm từ 0
+                pos = pos if fresh else 0.0
+            elif fresh:
+                pass  # mốc mới -> khớp lại hoàn toàn, không giữ sai lệch cũ
+            else:
+                pos = current  # giữa 2 mốc: đồng hồ của app chạy liền mạch
             self.track, self.pos, self.playing = track, pos, playing
             self.stamp = now
             self.error = None
@@ -109,6 +125,7 @@ async def poll_player(state: PlayerState):
             with state.lock:
                 state.error = str(e)
             await asyncio.sleep(2)
+    last_sample = None
     while True:
         try:
             session = pick_session(manager)
@@ -122,6 +139,8 @@ async def poll_player(state: PlayerState):
                 duration = tl.end_time.total_seconds()
                 pos = tl.position.total_seconds()
                 upd = tl.last_updated_time
+                sample = (pos, upd)  # dừng/phát không tính là mốc mới (vị trí có thể chưa cập nhật)
+                fresh, last_sample = sample != last_sample, sample
                 if playing and upd is not None and upd.year > 2000:
                     if upd.tzinfo is None:
                         upd = upd.replace(tzinfo=timezone.utc)
@@ -132,7 +151,7 @@ async def poll_player(state: PlayerState):
                 if props and props.title:
                     track = {"title": props.title, "artist": props.artist or "",
                              "album": props.album_title or "", "duration": duration}
-                state.update(track, pos, playing)
+                state.update(track, pos, playing, fresh)
         except Exception as e:  # noqa: BLE001 - giữ vòng lặp sống
             with state.lock:
                 state.error = str(e)
@@ -281,7 +300,7 @@ def from_netease(track):
     return None
 
 
-LYRICS_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "lyrics")
+LYRICS_DIR = os.path.join(DATA_DIR, "lyrics")
 AI_DIR = os.path.join(LYRICS_DIR, "ai")  # lời do AI chép (ưu tiên thấp nhất)
 BAD_FILENAME = re.compile(r'[\\/:*?"<>|]')
 
@@ -429,6 +448,8 @@ class LyricsWindow:
         self.state = state
         self.cfg = load_config()
         set_lang(self.cfg["ui_lang"])
+        load_theme(self.cfg["theme"])
+        self.theme_now = theme.resolve(self.cfg["theme"])
         self.root = tk.Tk()
         self.root.title("Lyric Spotify")
         self.icon = make_icon()
@@ -478,6 +499,7 @@ class LyricsWindow:
         self.bind_events()
         self.relayout()
         self.root.after(80, self.show_in_taskbar)
+        self.root.after(3000, self.watch_windows_theme)
         self.tick()
 
     # ---- cửa sổ ---------------------------------------------------------- #
@@ -626,6 +648,8 @@ class LyricsWindow:
     def set_alpha(self, a):
         self.cfg["alpha"] = round(min(1.0, max(0.15, a)), 2)
         self.root.attributes("-alpha", self.cfg["alpha"])
+        self.cur = None  # tô màu lại theo độ mờ mới
+        self.recolor()
         self.toast(t("toast_alpha", pct=round(self.cfg["alpha"] * 100)))
         self.save_soon()
 
@@ -651,6 +675,8 @@ class LyricsWindow:
         keep = {k: self.cfg[k] for k in ("x", "y", "w", "h")}
         self.cfg = {**DEFAULTS, **keep}
         set_lang(self.cfg["ui_lang"])
+        load_theme(self.cfg["theme"])
+        self.root.configure(bg=BG)
         self.root.attributes("-alpha", self.cfg["alpha"])
         self.root.attributes("-transparentcolor", KEY if self.cfg["glass"] else "")
         self.save_config()
@@ -667,6 +693,28 @@ class LyricsWindow:
     @staticmethod
     def cache_dir():
         return CACHE_DIR
+
+    def set_theme(self, choice):
+        self.cfg["theme"] = choice
+        self.save_config()
+        self.apply_theme()
+        self.reopen_settings()
+
+    def apply_theme(self):
+        load_theme(self.cfg["theme"])
+        self.theme_now = theme.resolve(self.cfg["theme"])
+        self.root.configure(bg=BG)
+        self.canvas.configure(bg=BG)
+        if self.cfg["glass"]:
+            self.root.attributes("-transparentcolor", KEY)
+        self.relayout()
+
+    def watch_windows_theme(self):
+        """Chế độ "Theo Windows": đổi màu ngay khi người dùng đổi sáng/tối trong Windows."""
+        if self.cfg["theme"] == "system" and theme.resolve("system") != self.theme_now:
+            self.apply_theme()
+            self.reopen_settings()
+        self.root.after(3000, self.watch_windows_theme)
 
     def set_text_style(self, size, family, bold):
         self.cfg.update(font=size, font_family=family, bold=bold)
@@ -712,7 +760,7 @@ class LyricsWindow:
         frame = tk.Frame(win, bg=PANEL, padx=1, pady=1)
         frame.pack(fill="both", expand=True, padx=16)
         box = tk.Text(frame, wrap="word", font=(FONT, 11), undo=True, bg=PANEL, fg=FG,
-                      insertbackground=FG, selectbackground="#3a3a3a", relief="flat",
+                      insertbackground=FG, selectbackground=SELECT, relief="flat",
                       padx=10, pady=8, highlightthickness=0)
         box.pack(fill="both", expand=True)
         if self.lyrics:  # sửa lời hiện có
@@ -734,10 +782,10 @@ class LyricsWindow:
         bar = tk.Frame(win, bg=BG, pady=12)
         bar.pack(fill="x", padx=16)
         flat = dict(relief="flat", bd=0, font=(FONT, 10, "bold"), padx=18, pady=6, cursor="hand2")
-        tk.Button(bar, text=t("save"), command=save, bg=ACCENT, fg="#000000",
-                  activebackground="#3be477", **flat).pack(side="right")
+        tk.Button(bar, text=t("save"), command=save, bg=ACCENT, fg=ON_ACCENT,
+                  activebackground=ACCENT_HOVER, activeforeground=ON_ACCENT, **flat).pack(side="right")
         tk.Button(bar, text=t("cancel"), command=win.destroy, bg=PANEL, fg=FG,
-                  activebackground="#333333", activeforeground=FG, **flat).pack(side="right", padx=8)
+                  activebackground=HOVER, activeforeground=FG, **flat).pack(side="right", padx=8)
         tk.Button(bar, text=t("open_folder"), command=self.open_lyrics_dir, bg=BG, fg=FG_DIM,
                   activebackground=BG, activeforeground=FG, **flat).pack(side="left")
         win.bind("<Control-s>", lambda e: save())
@@ -759,6 +807,13 @@ class LyricsWindow:
                 json.dump(self.cfg, f, indent=2)
         except OSError:
             pass
+
+    def restart(self):
+        """Mở lại app (sau khi cài phần AI)."""
+        import subprocess
+        args = [sys.executable] if getattr(sys, "frozen", False) else [sys.executable, os.path.abspath(__file__)]
+        self.quit()
+        subprocess.Popen(args, close_fds=True)
 
     def quit(self):
         self.stop_ai()
@@ -847,7 +902,9 @@ class LyricsWindow:
         return self.cfg["glass"] and not self.hover
 
     def palette(self):
-        return LINE_GLASS if self.glass_idle() else LINE_SOLID
+        if self.glass_idle():
+            return LINE_GLASS
+        return LINE_FADED if self.cfg["alpha"] < 0.85 else LINE_SOLID
 
     def text(self, x, y, tags, **kw):
         return self.canvas.create_text(x, y, tags=tags, **kw)
@@ -918,7 +975,7 @@ class LyricsWindow:
         # góc dưới: thời gian + tay nắm đổi kích thước (chỉ hiện khi rê chuột)
         c.create_text(14, h - 8, anchor="sw", text="", font=(FONT, 9), fill=FG_DIM, tags=("footer", "time"))
         c.create_text(w - 4, h - 3, anchor="se", text="", font=(ICON_FONT, 9),
-                      fill="#4a4a4a", tags="footer")
+                      fill=GRIP, tags="footer")
         # thông báo nhanh
         c.create_rectangle(0, 0, 0, 0, fill=PANEL, outline="", tags=("toast", "toastbg"))
         c.create_text(w / 2, HEADER_H + 22, text="", font=(FONT, 10), fill=FG, tags=("toast", "toasttext"))
@@ -1141,7 +1198,30 @@ def log_exception(exc=None):
         pass
 
 
+def selftest_ai():
+    """LyricSpotify.exe --selftest-ai : kiểm tra phần AI (ghi kết quả vào file log)."""
+    out = []
+    try:
+        import numpy as np
+        out.append(f"AI available={transcriber.available()} separation={transcriber.separation_available()}")
+        model = transcriber.get_model("small")
+        segs, info = model.transcribe(np.zeros(16000, np.float32), language="vi")
+        list(segs)
+        out.append("whisper OK")
+        sep = transcriber.get_separator()
+        out.append(f"demucs OK, vocals shape={sep(np.zeros(16000 * 3, np.float32)).shape}" if sep else "demucs: not available")
+        transcriber.release_separator()
+    except Exception:  # noqa: BLE001
+        import traceback
+        out.append(traceback.format_exc())
+    with open(LOG_PATH, "a", encoding="utf-8") as f:
+        f.write("[selftest-ai] " + " | ".join(out) + "\n")
+
+
 def main():
+    if "--selftest-ai" in sys.argv:
+        selftest_ai()
+        return
     try:  # icon riêng trên taskbar thay vì icon Python
         ctypes.windll.shell32.SetCurrentProcessExplicitAppUserModelID("LyricSpotify.App")
     except Exception:  # noqa: BLE001
@@ -1166,4 +1246,6 @@ def main():
 
 
 if __name__ == "__main__":
+    import multiprocessing
+    multiprocessing.freeze_support()  # bản exe: tiến trình con (Demucs) chạy đúng
     main()

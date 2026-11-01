@@ -5,10 +5,20 @@ import tkinter as tk
 from tkinter import font as tkfont
 from tkinter import messagebox, ttk
 
+import ai_runtime
+import theme
 import transcriber
 from i18n import UI_LANGS, t
 
-BG, PANEL, FG, FG_DIM, FG_OFF, ACCENT = "#121212", "#1e1e1e", "#ffffff", "#a7a7a7", "#5a5a5a", "#1ed760"
+def load_theme(choice):
+    """Màu theo giao diện tối / sáng (cùng bảng màu với cửa sổ lời)."""
+    global BG, PANEL, FG, FG_DIM, FG_OFF, ACCENT, ACCENT_HOVER, ON_ACCENT, HOVER
+    c = theme.colors(choice)
+    BG, PANEL, FG, FG_DIM, FG_OFF = c["BG"], c["PANEL2"], c["FG"], c["FG_DIM"], c["FG_OFF"]
+    ACCENT, ACCENT_HOVER, ON_ACCENT, HOVER = c["ACCENT"], c["ACCENT_HOVER"], c["ON_ACCENT"], c["HOVER"]
+
+
+load_theme("dark")
 FONT = "Segoe UI"
 FONT_CHOICES = ["Segoe UI", "Arial", "Tahoma", "Verdana", "Calibri", "Cambria", "Georgia",
                 "Times New Roman", "Trebuchet MS", "Roboto", "Montserrat", "Be Vietnam Pro",
@@ -19,6 +29,7 @@ class SettingsWindow:
     def __init__(self, app):
         self.app = app
         cfg = app.cfg
+        load_theme(cfg["theme"])
         w = self.win = tk.Toplevel(app.root, bg=BG)
         w.title(t("settings_title"))
         w.geometry("460x720")
@@ -34,7 +45,7 @@ class SettingsWindow:
         # thanh nút ghim ở đáy, phần trên cuộn được
         bar = tk.Frame(w, bg=BG, pady=12)
         bar.pack(side="bottom", fill="x", padx=20)
-        tk.Frame(w, bg="#2a2a2a", height=1).pack(side="bottom", fill="x")
+        tk.Frame(w, bg=HOVER, height=1).pack(side="bottom", fill="x")
         self.button(bar, t("done"), self.close, primary=True).pack(side="right")
         self.button(bar, t("reset_defaults"), self.reset).pack(side="left")
 
@@ -55,6 +66,10 @@ class SettingsWindow:
 
         # ---- Giao diện ----
         self.section(t("sec_ui"))
+        theme_names = {k: t(f"theme_{k}") for k in theme.CHOICES}
+        self.theme_var = tk.StringVar(value=theme_names.get(cfg["theme"], theme_names["dark"]))
+        self.choice(t("theme"), self.theme_var, list(theme_names.values()),
+                    lambda: self.on_theme(theme_names))
         self.font_size = tk.IntVar(value=cfg["font"])
         self.slider(t("font_size"), self.font_size, 10, 40, self.on_font)
         installed = set(tkfont.families())
@@ -83,8 +98,8 @@ class SettingsWindow:
 
         # ---- AI chép lời ----
         self.section(t("sec_ai"))
-        if not transcriber.available():
-            self.note(t("ai_missing"))
+        if not transcriber.available() or not transcriber.separation_available():
+            self.install_box()
         self.ai_on = tk.BooleanVar(value=cfg["ai_enabled"])
         self.check(t("ai_enable"), self.ai_on, self.on_ai)
         self.ai_widgets = []   # làm mờ khi tắt AI
@@ -95,8 +110,6 @@ class SettingsWindow:
             self.radio(t(f"model_{key}") + mark, self.model, key, self.on_ai)
         self.separate = tk.BooleanVar(value=cfg["ai_separate"])
         self.check(t("ai_separate"), self.separate, self.on_ai, group=self.ai_widgets)
-        if not transcriber.separation_available():
-            self.note(t("separate_missing"))
 
         # nguồn âm thanh AI nghe
         self.label(t("ai_device"), group=self.ai_widgets)
@@ -129,9 +142,9 @@ class SettingsWindow:
 
     def button(self, parent, text, command, primary=False):
         if primary:
-            colors = dict(bg=ACCENT, fg="#000000", activebackground="#3be477", activeforeground="#000000")
+            colors = dict(bg=ACCENT, fg=ON_ACCENT, activebackground=ACCENT_HOVER, activeforeground=ON_ACCENT)
         else:
-            colors = dict(bg=PANEL, fg=FG, activebackground="#2a2a2a", activeforeground=FG)
+            colors = dict(bg=PANEL, fg=FG, activebackground=HOVER, activeforeground=FG)
         return tk.Button(parent, text=text, command=command, relief="flat", bd=0, cursor="hand2",
                          font=(FONT, 10, "bold" if primary else "normal"), padx=14, pady=5, **colors)
 
@@ -175,10 +188,10 @@ class SettingsWindow:
             self.label(text)
         om = tk.OptionMenu(self.body, var, *values,
                            command=lambda _v: (command(), self.refresh_states()))
-        om.configure(bg=PANEL, fg=FG, activebackground="#2a2a2a", activeforeground=FG,
+        om.configure(bg=PANEL, fg=FG, activebackground=HOVER, activeforeground=FG,
                      disabledforeground=FG_OFF, highlightthickness=0, relief="flat", bd=0,
                      font=(FONT, 10), anchor="w")
-        om["menu"].configure(bg=PANEL, fg=FG, activebackground=ACCENT, activeforeground="#000000",
+        om["menu"].configure(bg=PANEL, fg=FG, activebackground=ACCENT, activeforeground=ON_ACCENT,
                              font=(FONT, 10))
         om.pack(fill="x", padx=24, pady=2)
         return om
@@ -193,6 +206,56 @@ class SettingsWindow:
                 wdg.configure(state="normal" if ai else "disabled")
         default_dev = self.device.get() == t("default_device")
         self.only_spotify_box.configure(state="normal" if ai and default_dev else "disabled")
+
+    # ---- tải phần AI ------------------------------------------------------- #
+
+    def install_box(self):
+        """Phần AI không nằm trong bản cài gốc: tải về khi người dùng muốn."""
+        box = tk.Frame(self.body, bg=PANEL, padx=12, pady=10)
+        box.pack(fill="x", padx=22, pady=(4, 8))
+        has_ai = transcriber.available()
+        tk.Label(box, text=t("ai_extra_title") if has_ai else t("ai_install_title"), bg=PANEL, fg=FG,
+                 font=(FONT, 10, "bold"), anchor="w").pack(fill="x")
+        tk.Label(box, text=t("ai_extra_note") if has_ai else t("ai_install_note"), bg=PANEL, fg=FG_DIM,
+                 font=(FONT, 9), anchor="w", justify="left", wraplength=370).pack(fill="x", pady=(2, 6))
+        self.with_demucs = tk.BooleanVar(value=True)
+        if not has_ai:
+            tk.Checkbutton(box, text=t("ai_install_demucs"), variable=self.with_demucs, bg=PANEL, fg=FG,
+                           selectcolor=BG, activebackground=PANEL, activeforeground=FG, font=(FONT, 9),
+                           anchor="w", bd=0, highlightthickness=0).pack(fill="x")
+        self.install_status = tk.Label(box, text="", bg=PANEL, fg=FG_DIM, font=(FONT, 8), anchor="w",
+                                       justify="left", wraplength=370)
+        self.install_status.pack(fill="x", pady=(4, 0))
+        self.install_btn = self.button(box, t("ai_install_btn"), self.start_install, primary=True)
+        self.install_btn.pack(anchor="w", pady=(6, 0))
+
+    def start_install(self):
+        import threading
+        self.install_btn.configure(state="disabled", text=t("ai_installing"))
+        with_demucs = self.with_demucs.get() or transcriber.available()
+
+        def progress(line):
+            self.win.after(0, lambda: self.install_status.winfo_exists()
+                           and self.install_status.configure(text=line[-160:]))
+
+        def work():
+            try:
+                ok = ai_runtime.install(with_demucs, progress)
+            except Exception as e:  # noqa: BLE001
+                ok = False
+                progress(str(e))
+            self.win.after(0, lambda: self.install_done(ok))
+
+        threading.Thread(target=work, daemon=True).start()
+
+    def install_done(self, ok):
+        if not self.install_btn.winfo_exists():
+            return
+        if ok:
+            self.install_status.configure(text=t("ai_install_ok"), fg=ACCENT)
+            self.install_btn.configure(state="normal", text=t("restart_app"), command=self.app.restart)
+        else:
+            self.install_btn.configure(state="normal", text=t("ai_install_retry"))
 
     # ---- lời đã lưu --------------------------------------------------------- #
 
@@ -237,6 +300,11 @@ class SettingsWindow:
         code = next(k for k, v in UI_LANGS.items() if v == self.ui_lang.get())
         if code != self.app.cfg["ui_lang"]:
             self.app.root.after(10, lambda: self.app.set_ui_lang(code))
+
+    def on_theme(self, names):
+        code = next(k for k, v in names.items() if v == self.theme_var.get())
+        if code != self.app.cfg["theme"]:
+            self.app.root.after(10, lambda: self.app.set_theme(code))
 
     def reset(self):
         if messagebox.askyesno(t("reset_defaults"), t("confirm_reset"), parent=self.win):
