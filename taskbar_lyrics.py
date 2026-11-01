@@ -14,6 +14,10 @@ from tkinter import font as tkfont
 user32 = ctypes.windll.user32
 gdi32 = ctypes.windll.gdi32
 gdi32.GetPixel.restype = ctypes.c_uint32
+user32.GetWindowLongPtrW.restype = ctypes.c_ssize_t
+user32.GetWindowLongPtrW.argtypes = [W.HWND, ctypes.c_int]
+user32.SetWindowLongPtrW.restype = ctypes.c_ssize_t
+user32.SetWindowLongPtrW.argtypes = [W.HWND, ctypes.c_int, ctypes.c_ssize_t]
 KEY = "#010203"
 PAD = 6
 HWND_TOPMOST = -1
@@ -179,7 +183,15 @@ class TaskbarLyrics:
 
     def raise_now(self):
         hwnd = user32.GetParent(self.win.winfo_id())
+        self.own_by_taskbar(hwnd)
         user32.SetWindowPos(hwnd, HWND_TOPMOST, 0, 0, 0, 0, SWP_FLAGS)
+
+    def own_by_taskbar(self, hwnd):
+        """Cho dải lời "thuộc về" thanh taskbar: Windows luôn đặt cửa sổ con phía trên cửa sổ cha,
+        nên bấm vào taskbar (taskbar trồi lên) thì dải lời vẫn nằm trên ngay, không bị che."""
+        tray = user32.FindWindowW("Shell_TrayWnd", None)
+        if tray and user32.GetWindowLongPtrW(hwnd, -8) != tray:  # GWLP_HWNDPARENT = cửa sổ sở hữu
+            user32.SetWindowLongPtrW(hwnd, -8, tray)
 
     # ---- vẽ ------------------------------------------------------------ #
 

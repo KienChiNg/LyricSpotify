@@ -520,14 +520,23 @@ class LyricsWindow:
     # ---- cửa sổ ---------------------------------------------------------- #
 
     def show_in_taskbar(self):
-        """Cửa sổ không viền vẫn có icon trên taskbar để dễ tìm."""
+        """Cửa sổ không viền vẫn có biểu tượng trên taskbar (để thu nhỏ / mở lại được).
+
+        Tk tạo lại cửa sổ (kèm cờ TOOLWINDOW, không có biểu tượng taskbar) mỗi khi ẩn rồi hiện lại,
+        nên hàm này được gọi đều đặn: thấy mất cờ APPWINDOW thì gắn lại, rồi ẩn/hiện bằng Win32
+        (không qua Tk, để không tạo lại cửa sổ) cho taskbar cập nhật."""
         try:
+            if self.root.state() == "withdrawn":
+                return
             user32 = ctypes.windll.user32
             hwnd = user32.GetParent(self.root.winfo_id())
-            style = user32.GetWindowLongW(hwnd, -20)  # GWL_EXSTYLE
-            user32.SetWindowLongW(hwnd, -20, (style & ~0x80) | 0x40000)  # bỏ TOOLWINDOW, thêm APPWINDOW
-            self.root.withdraw()
-            self.root.after(10, self.root.deiconify)
+            ex = user32.GetWindowLongW(hwnd, -20)  # GWL_EXSTYLE
+            want = (ex & ~0x80) | 0x40000          # bỏ TOOLWINDOW, thêm APPWINDOW
+            if ex != want:
+                iconic = user32.IsIconic(hwnd)
+                user32.ShowWindow(hwnd, 0)          # SW_HIDE
+                user32.SetWindowLongW(hwnd, -20, want)
+                user32.ShowWindow(hwnd, 7 if iconic else 8)  # SW_SHOWMINNOACTIVE / SW_SHOWNA
         except Exception:  # noqa: BLE001
             pass
 
@@ -611,6 +620,7 @@ class LyricsWindow:
         """Chuột ở bất kỳ đâu trong khung cửa sổ (kể cả vùng nền trong suốt vốn không nhận chuột)
         -> hiện nền + nút + nhận kéo ở mép; rời khung -> ẩn như cũ."""
         try:
+            self.show_in_taskbar()  # giữ biểu tượng taskbar (Tk có thể làm mất khi ẩn/hiện cửa sổ)
             if self.root.state() == "normal":
                 x, y = self.root.winfo_pointerxy()
                 rx, ry = self.root.winfo_rootx(), self.root.winfo_rooty()
@@ -1373,6 +1383,22 @@ def selftest_ai():
         f.write("[selftest-ai] " + " | ".join(out) + "\n")
 
 
+def single_instance():
+    """Chỉ chạy một bản app: đã có bản đang chạy thì đưa cửa sổ của nó lên trước rồi thoát."""
+    user32 = ctypes.windll.user32
+    _MUTEX["h"] = ctypes.windll.kernel32.CreateMutexW(None, False, "LyricSpotify.SingleInstance")
+    if ctypes.windll.kernel32.GetLastError() != 183:  # ERROR_ALREADY_EXISTS
+        return True
+    hwnd = user32.FindWindowW("TkTopLevel", "Lyric Spotify")
+    if hwnd:
+        user32.ShowWindow(hwnd, 9)  # SW_RESTORE
+        user32.SetForegroundWindow(hwnd)
+    return False
+
+
+_MUTEX = {"h": None}  # giữ mutex suốt thời gian app chạy
+
+
 def main():
     # bản exe không có console: thư viện in ra stdout/stderr (thanh tiến trình tải mô hình) không bị lỗi
     if sys.stdout is None:
@@ -1408,6 +1434,8 @@ def main():
         pass
     state = PlayerState()
     threading.Thread(target=lambda: asyncio.run(poll_player(state)), daemon=True).start()
+    if not single_instance():
+        return
     try:
         LyricsWindow(state).run()
     finally:
