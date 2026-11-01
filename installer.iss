@@ -9,7 +9,11 @@
 
 [Setup]
 InfoAfterFile=installer\after-install.txt
+#ifdef TestBuild
+AppId={{6C1F7F2E-0000-0000-0000-7E57B0117E57}
+#else
 AppId={{6C1F7F2E-6B7A-4C55-9A0B-3E6E2B8C4D11}
+#endif
 AppName={#AppName}
 AppVersion={#AppVersion}
 AppPublisher={#AppPublisher}
@@ -58,7 +62,10 @@ Name: "demucs"; Description: "{cm:DemucsTask}"; GroupDescription: "{cm:AiGroup}"
 
 [Files]
 Source: "dist\{#AppExe}"; DestDir: "{app}"; Flags: ignoreversion
-Source: "README.md"; DestDir: "{app}"; Flags: ignoreversion isreadme
+
+[InstallDelete]
+; bản cũ có cài kèm README.md (hiện sau khi cài) -> dọn đi khi cập nhật
+Type: files; Name: "{app}\README.md"
 
 [Dirs]
 ; thư mục lời bài hát nằm cạnh app, người dùng ghi được
@@ -77,6 +84,8 @@ Filename: "{app}\{#AppExe}"; Parameters: "--install-ai --lang={language}"; Statu
 Filename: "{app}\{#AppExe}"; Parameters: "--install-ai --demucs --lang={language}"; StatusMsg: "{cm:AiStatus}"; Tasks: demucs; Flags: waituntilterminated
 Filename: "{app}\{#AppExe}"; Parameters: "--lang={language}"; Description: "{cm:LaunchProgram,{#AppName}}"; Flags: nowait postinstall skipifsilent
 
+#ifndef TestBuild
+; bản thử (TestBuild) không tắt app đang chạy và không xoá dữ liệu dùng chung của bản thật
 [UninstallRun]
 ; tắt app trước khi gỡ (nếu đang chạy)
 Filename: "{sys}\taskkill.exe"; Parameters: "/F /IM {#AppExe}"; Flags: runhidden; RunOnceId: "KillApp"
@@ -84,6 +93,7 @@ Filename: "{sys}\taskkill.exe"; Parameters: "/F /IM {#AppExe}"; Flags: runhidden
 [UninstallDelete]
 ; phần AI tải thêm (vài GB) và công cụ tải nằm ngoài thư mục cài -> xoá cùng khi gỡ
 Type: filesandordirs; Name: "{localappdata}\LyricSpotify"
+#endif
 
 [Code]
 function AiLibs(): String;
