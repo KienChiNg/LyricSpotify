@@ -30,7 +30,7 @@ extra_dlls = [(os.path.join(sys.base_prefix, n), ".") for n in ("python3.dll", "
 
 a = Analysis(
     ["spotify_lyrics.py"],
-    datas=[("icon.ico", ".")] + winrt_datas,
+    datas=[("icon.ico", "."), ("icon-header.png", ".")] + winrt_datas,
     binaries=winrt_bins + extra_dlls,
     hiddenimports=hidden + winrt_hidden + ["ai_runtime", "transcriber", "settings_window", "i18n", "theme"],
     excludes=AI_EXCLUDES,

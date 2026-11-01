@@ -49,6 +49,8 @@ DEFAULTS = {"x": 120, "y": 120, "w": 520, "h": 400, "font": 17,
 APP_DIR = getattr(sys, "_MEIPASS", os.path.dirname(os.path.abspath(__file__)))  # tài nguyên (icon)
 # dữ liệu của người dùng (thư mục lời): cạnh file exe khi chạy bản đóng gói
 DATA_DIR = os.path.dirname(sys.executable) if getattr(sys, "frozen", False) else os.path.dirname(os.path.abspath(__file__))
+if not os.access(DATA_DIR, os.W_OK):  # cài vào thư mục không ghi được (vd: Program Files)
+    DATA_DIR = os.path.join(os.environ.get("LOCALAPPDATA") or os.path.expanduser("~"), "LyricSpotify")
 
 FONT = "Segoe UI"
 ICON_FONT = "Segoe MDL2 Assets"
@@ -453,6 +455,10 @@ class LyricsWindow:
         self.root = tk.Tk()
         self.root.title("Lyric Spotify")
         self.icon = make_icon()
+        try:  # icon nhỏ ở thanh tiêu đề cửa sổ lời
+            self.header_icon = tk.PhotoImage(master=None, file=os.path.join(APP_DIR, "icon-header.png"))
+        except (tk.TclError, RuntimeError):
+            self.header_icon = None
         if self.icon:
             self.root.iconbitmap(default=self.icon)
         self.root.overrideredirect(True)
@@ -941,8 +947,11 @@ class LyricsWindow:
 
         # header: icon + tên bài + ca sĩ, vẽ đè lên phần lời đã cuộn qua
         c.create_rectangle(0, 0, w, HEADER_H, fill=BG, outline="", tags=("header", "headerbg"))
-        c.create_oval(16, 15, 50, 49, fill=PANEL, outline="", tags="header")
-        c.create_text(33, 32, text="♫", font=(FONT, 13), fill=ACCENT, tags="header")
+        if self.header_icon:
+            c.create_image(33, 32, image=self.header_icon, tags="header")
+        else:
+            c.create_oval(16, 15, 50, 49, fill=PANEL, outline="", tags="header")
+            c.create_text(33, 32, text="♫", font=(FONT, 13), fill=ACCENT, tags="header")
         tr = self.track
         c.create_text(62, 16, anchor="nw", text=tr["title"] if tr else "Lyric Spotify",
                       font=(FONT, 12, "bold"), fill=FG, width=w - 80, tags="header")
