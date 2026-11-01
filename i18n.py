@@ -15,7 +15,7 @@ STRINGS = {
         "menu_show_window": "Hiện cửa sổ lời",
         "taskbar_mode": "Hiện lời chạy trên thanh taskbar",
         "taskbar_hide_main": "Ẩn cửa sổ lời lớn khi đang hiện lời trên taskbar "
-                             "(nhấp đúp vào chữ trên taskbar để mở lại)",
+                             "(bấm vào chữ trên taskbar để mở lại)",
         "taskbar_width": "Độ rộng dải lời trên taskbar (px)",
         "pin_title": "Ghim Lyric Spotify vào taskbar",
         "pin_steps": "Windows không cho ứng dụng tự ghim, bạn làm 2 bước:\n\n"
@@ -127,7 +127,7 @@ STRINGS = {
         "menu_show_window": "Show lyrics window",
         "taskbar_mode": "Show lyrics on the taskbar",
         "taskbar_hide_main": "Hide the big lyrics window while lyrics are on the taskbar "
-                             "(double-click the taskbar lyrics to reopen it)",
+                             "(click the taskbar lyrics to reopen it)",
         "taskbar_width": "Taskbar lyrics width (px)",
         "pin_title": "Pin Lyric Spotify to the taskbar",
         "pin_steps": "Windows does not let apps pin themselves. Two steps:\n\n"

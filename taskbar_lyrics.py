@@ -12,6 +12,8 @@ import tkinter as tk
 from tkinter import font as tkfont
 
 user32 = ctypes.windll.user32
+gdi32 = ctypes.windll.gdi32
+gdi32.GetPixel.restype = ctypes.c_uint32
 KEY = "#010203"
 PAD = 6
 HWND_TOPMOST = -1
@@ -64,18 +66,20 @@ class TaskbarLyrics:
         self.win.attributes("-topmost", True)
         self.win.configure(bg=KEY)
         self.win.attributes("-transparentcolor", KEY)
-        self.canvas = tk.Canvas(self.win, bg=KEY, highlightthickness=0)
+        self.canvas = tk.Canvas(self.win, bg=KEY, highlightthickness=0, cursor="hand2")
         self.canvas.pack(fill="both", expand=True)
         self.lines = ("", "")
         self.marquee = None
         self.geom = None
         self.hidden = False
         self.drag = None
+        self.moved = False
+        self.bg = KEY
+        self.ticks = 0
         c = self.canvas
         c.bind("<ButtonPress-1>", self.on_press)
         c.bind("<B1-Motion>", self.on_drag)
-        c.bind("<ButtonRelease-1>", lambda e: app.save_config())
-        c.bind("<Double-Button-1>", lambda e: app.show_main_window())
+        c.bind("<ButtonRelease-1>", self.on_release)
         c.bind("<Button-3>", lambda e: app.menu.tk_popup(e.x_root, e.y_root))
         self.place()
         self.keep_on_top()
@@ -106,10 +110,24 @@ class TaskbarLyrics:
 
     def on_press(self, e):
         self.drag = (e.x_root, self.app.cfg["taskbar_offset"])
+        self.moved = False
+        self.raise_now()
+
+    def on_release(self, _e):
+        if self.drag and not self.moved:
+            # bấm (không kéo) vào dải lời -> quay về giao diện bình thường của app
+            self.app.root.after(10, lambda: self.app.set_taskbar_mode(False))
+        else:
+            self.app.save_config()
+        self.drag = None
 
     def on_drag(self, e):
         if self.drag:
             x0, off0 = self.drag
+            if abs(e.x_root - x0) > 4:
+                self.moved = True
+            if not self.moved:
+                return
             self.app.cfg["taskbar_offset"] = max(0, off0 - (e.x_root - x0))
             self.place()
 
@@ -125,10 +143,43 @@ class TaskbarLyrics:
             if self.hidden:
                 self.win.deiconify()
                 self.hidden = False
-            hwnd = user32.GetParent(self.win.winfo_id())
-            user32.SetWindowPos(hwnd, HWND_TOPMOST, 0, 0, 0, 0, SWP_FLAGS)
+            self.raise_now()
             self.place()
-        self.win.after(500, self.keep_on_top)
+            self.ticks += 1
+            if self.ticks % 10 == 1:  # mỗi giây: nền theo màu taskbar
+                self.match_taskbar_color()
+        # bấm vào taskbar (hoặc khe giữa các chữ) đưa taskbar lên trên -> đẩy dải chữ lên lại thật nhanh
+        self.win.after(100, self.keep_on_top)
+
+    def match_taskbar_color(self):
+        """Tô nền dải chữ đúng màu taskbar (đọc ở khe giữa dải chữ và khu đồng hồ).
+        Nền đặc (không trong suốt) nên bấm/kéo được ở mọi chỗ, nhìn vẫn như chữ nằm trên taskbar."""
+        if not self.geom or self.geom[0] == 360:  # taskbar dựng đứng: giữ nền trong suốt
+            return
+        w, h, x, y = self.geom
+        gx = x + w + 3
+        dc = user32.GetDC(0)
+        try:
+            vals = [gdi32.GetPixel(dc, gx, y + int(h * f)) for f in (0.15, 0.5, 0.85)]
+        finally:
+            user32.ReleaseDC(0, dc)
+        vals = [v for v in vals if v != 0xFFFFFFFF]
+        if not vals:
+            return
+        r = sum(v & 0xFF for v in vals) // len(vals)
+        g = sum((v >> 8) & 0xFF for v in vals) // len(vals)
+        b = sum((v >> 16) & 0xFF for v in vals) // len(vals)
+        color = f"#{r:02x}{g:02x}{b:02x}"
+        if color == KEY:
+            color = "#020304"
+        if color != self.bg:
+            self.bg = color
+            self.canvas.configure(bg=color)
+            self.win.configure(bg=color)
+
+    def raise_now(self):
+        hwnd = user32.GetParent(self.win.winfo_id())
+        user32.SetWindowPos(hwnd, HWND_TOPMOST, 0, 0, 0, 0, SWP_FLAGS)
 
     # ---- vẽ ------------------------------------------------------------ #
 
