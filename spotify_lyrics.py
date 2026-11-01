@@ -576,7 +576,6 @@ class LyricsWindow:
              t("btn_restore") if self.maximized else t("btn_max"), self.toggle_maximize),
             ("min", "", t("btn_min"), self.minimize),
             ("more", "", t("btn_more"), self.menu_from_button),
-            ("edit", "", t("btn_edit"), self.edit_lyrics),
             ("glass", "", t("btn_glass"), self.toggle_glass),
             ("settings", "", t("btn_settings"), self.open_settings),
         ]
