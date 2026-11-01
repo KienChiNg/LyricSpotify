@@ -1,3 +1,7 @@
+<p align="center">
+  <img src="icon.png" width="128" alt="Lyric Spotify icon">
+</p>
+
 # Lyric Spotify 🎶
 
 Cửa sổ nổi trên màn hình Windows hiển thị **lời bài hát chạy theo nhạc** của bài đang phát trên app Spotify.
