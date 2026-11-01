@@ -32,7 +32,7 @@ a = Analysis(
     ["spotify_lyrics.py"],
     datas=[("icon.ico", "."), ("icon-header.png", ".")] + winrt_datas,
     binaries=winrt_bins + extra_dlls,
-    hiddenimports=hidden + winrt_hidden + ["ai_runtime", "transcriber", "settings_window", "i18n", "theme"],
+    hiddenimports=hidden + winrt_hidden + ["ai_runtime", "transcriber", "settings_window", "i18n", "theme", "ai_setup"],
     excludes=AI_EXCLUDES,
 )
 pyz = PYZ(a.pure)

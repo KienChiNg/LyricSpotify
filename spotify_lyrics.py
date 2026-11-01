@@ -1228,9 +1228,26 @@ def selftest_ai():
 
 
 def main():
+    # bản exe không có console: thư viện in ra stdout/stderr (thanh tiến trình tải mô hình) không bị lỗi
+    if sys.stdout is None:
+        sys.stdout = open(os.devnull, "w", encoding="utf-8")
+    if sys.stderr is None:
+        sys.stderr = open(os.devnull, "w", encoding="utf-8")
+    os.environ.setdefault("HF_HUB_DISABLE_PROGRESS_BARS", "1")
+    # trình cài đặt truyền ngôn ngữ đã chọn: dùng làm ngôn ngữ app ở lần chạy đầu tiên
+    lang = next((a.split("=", 1)[1] for a in sys.argv if a.startswith("--lang=")), None)
+    if lang and not os.path.exists(CONFIG_PATH):
+        try:
+            with open(CONFIG_PATH, "w", encoding="utf-8") as f:
+                json.dump({"ui_lang": "en" if lang.startswith("en") else "vi"}, f)
+        except OSError:
+            pass
     if "--selftest-ai" in sys.argv:
         selftest_ai()
         return
+    if "--install-ai" in sys.argv:  # gọi từ trình cài đặt: tải phần AI có cửa sổ tiến trình
+        import ai_setup
+        sys.exit(ai_setup.run(load_config(), with_demucs="--demucs" in sys.argv))
     try:  # icon riêng trên taskbar thay vì icon Python
         ctypes.windll.shell32.SetCurrentProcessExplicitAppUserModelID("LyricSpotify.App")
     except Exception:  # noqa: BLE001

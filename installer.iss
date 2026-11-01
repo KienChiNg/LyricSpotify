@@ -40,10 +40,20 @@ Name: "english"; MessagesFile: "compiler:Default.isl"
 [CustomMessages]
 vietnamese.StartupTask=Tự mở {#AppName} khi khởi động Windows
 english.StartupTask=Start {#AppName} when Windows starts
+vietnamese.AiGroup=AI chép lời khi không tìm thấy lời (tuỳ chọn, cần card NVIDIA, có thể tải sau trong app):
+english.AiGroup=AI lyrics transcription when no lyrics are found (optional, needs an NVIDIA GPU, can be added later in the app):
+vietnamese.AiTask=Tải phần AI chép lời (~3 GB + mô hình ~1.6 GB)
+english.AiTask=Download the AI transcription add-on (~3 GB + ~1.6 GB model)
+vietnamese.DemucsTask=Kèm tách giọng hát Demucs để chép chính xác hơn (thêm ~2.5 GB)
+english.DemucsTask=Include Demucs vocal separation for better accuracy (+~2.5 GB)
+vietnamese.AiStatus=Đang tải phần AI chép lời (có thể mất vài chục phút)...
+english.AiStatus=Downloading the AI transcription add-on (may take a while)...
 
 [Tasks]
 Name: "desktopicon"; Description: "{cm:CreateDesktopIcon}"; GroupDescription: "{cm:AdditionalIcons}"
 Name: "startup"; Description: "{cm:StartupTask}"; GroupDescription: "{cm:AdditionalIcons}"; Flags: unchecked
+Name: "ai"; Description: "{cm:AiTask}"; GroupDescription: "{cm:AiGroup}"; Flags: unchecked
+Name: "ai\demucs"; Description: "{cm:DemucsTask}"; GroupDescription: "{cm:AiGroup}"; Flags: unchecked
 
 [Files]
 Source: "dist\{#AppExe}"; DestDir: "{app}"; Flags: ignoreversion
@@ -60,7 +70,10 @@ Name: "{autodesktop}\{#AppName}"; Filename: "{app}\{#AppExe}"; Tasks: desktopico
 Name: "{userstartup}\{#AppName}"; Filename: "{app}\{#AppExe}"; Tasks: startup
 
 [Run]
-Filename: "{app}\{#AppExe}"; Description: "{cm:LaunchProgram,{#AppName}}"; Flags: nowait postinstall skipifsilent
+; tải phần AI ngay trong lúc cài (cửa sổ tiến trình riêng của app), nếu người dùng chọn
+Filename: "{app}\{#AppExe}"; Parameters: "--install-ai --lang={language}"; StatusMsg: "{cm:AiStatus}"; Tasks: ai and not ai\demucs; Flags: waituntilterminated
+Filename: "{app}\{#AppExe}"; Parameters: "--install-ai --demucs --lang={language}"; StatusMsg: "{cm:AiStatus}"; Tasks: ai\demucs; Flags: waituntilterminated
+Filename: "{app}\{#AppExe}"; Parameters: "--lang={language}"; Description: "{cm:LaunchProgram,{#AppName}}"; Flags: nowait postinstall skipifsilent
 
 [UninstallRun]
 ; tắt app trước khi gỡ (nếu đang chạy)

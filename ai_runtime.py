@@ -64,6 +64,16 @@ def _uv(progress):
     return exe
 
 
+_proc = {"p": None}
+
+
+def cancel():
+    """Dừng việc cài đang chạy (người dùng bấm Huỷ)."""
+    p = _proc["p"]
+    if p and p.poll() is None:
+        p.terminate()
+
+
 def install(with_demucs, progress):
     """Cài phần AI. progress(str) nhận từng dòng tiến trình. Trả về True nếu thành công."""
     exe = _uv(progress)
@@ -77,6 +87,7 @@ def install(with_demucs, progress):
     proc = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, env=env,
                             text=True, encoding="utf-8", errors="replace",
                             creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0))
+    _proc["p"] = proc
     for line in proc.stdout:
         if line.strip():
             progress(line.strip())
