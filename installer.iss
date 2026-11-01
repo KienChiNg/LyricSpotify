@@ -2,7 +2,7 @@
 ; Build: build.bat (tự gọi), hoặc: ISCC.exe installer.iss  (cần dist\LyricSpotify.exe đã build)
 
 #define AppName "Lyric Spotify"
-#define AppVersion "1.0.0"
+#define AppVersion "1.0.1"
 #define AppExe "LyricSpotify.exe"
 #define AppPublisher "KienChiNg"
 #define AppURL "https://github.com/KienChiNg/LyricSpotify"
@@ -64,10 +64,11 @@ Source: "README.md"; DestDir: "{app}"; Flags: ignoreversion isreadme
 Name: "{app}\lyrics"
 
 [Icons]
-Name: "{group}\{#AppName}"; Filename: "{app}\{#AppExe}"
+; AppUserModelID trùng với app -> chuột phải biểu tượng trên taskbar -> "Ghim" ghim đúng app
+Name: "{group}\{#AppName}"; Filename: "{app}\{#AppExe}"; AppUserModelID: "LyricSpotify.App"
 Name: "{group}\{cm:UninstallProgram,{#AppName}}"; Filename: "{uninstallexe}"
-Name: "{autodesktop}\{#AppName}"; Filename: "{app}\{#AppExe}"; Tasks: desktopicon
-Name: "{userstartup}\{#AppName}"; Filename: "{app}\{#AppExe}"; Tasks: startup
+Name: "{autodesktop}\{#AppName}"; Filename: "{app}\{#AppExe}"; AppUserModelID: "LyricSpotify.App"; Tasks: desktopicon
+Name: "{userstartup}\{#AppName}"; Filename: "{app}\{#AppExe}"; AppUserModelID: "LyricSpotify.App"; Tasks: startup
 
 [Run]
 ; tải phần AI ngay trong lúc cài (cửa sổ tiến trình riêng của app), nếu người dùng chọn

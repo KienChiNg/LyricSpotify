@@ -10,6 +10,18 @@ STRINGS = {
         "menu_edit": "Thêm / sửa lời bài này…",
         "menu_reload": "Tải lại lời",
         "menu_folder": "Mở thư mục lời",
+        "menu_pin": "Ghim vào thanh taskbar…",
+        "menu_taskbar": "Lời trên thanh taskbar",
+        "menu_show_window": "Hiện cửa sổ lời",
+        "taskbar_mode": "Hiện lời chạy trên thanh taskbar",
+        "taskbar_hide_main": "Ẩn cửa sổ lời lớn khi đang hiện lời trên taskbar "
+                             "(nhấp đúp vào chữ trên taskbar để mở lại)",
+        "taskbar_width": "Độ rộng dải lời trên taskbar (px)",
+        "pin_title": "Ghim Lyric Spotify vào taskbar",
+        "pin_steps": "Windows không cho ứng dụng tự ghim, bạn làm 2 bước:\n\n"
+                     "1. Chuột phải vào biểu tượng Lyric Spotify đang nháy trên thanh taskbar.\n"
+                     "2. Chọn \"Ghim vào thanh tác vụ\" (Pin to taskbar).\n\n"
+                     "Từ lần sau chỉ cần bấm biểu tượng đó để mở app.",
         "menu_quit": "Thoát    Esc",
         "btn_close": "Đóng",
         "btn_more": "Thêm tuỳ chọn",
@@ -110,6 +122,18 @@ STRINGS = {
         "menu_edit": "Add / edit lyrics for this song…",
         "menu_reload": "Reload lyrics",
         "menu_folder": "Open lyrics folder",
+        "menu_pin": "Pin to taskbar…",
+        "menu_taskbar": "Lyrics on the taskbar",
+        "menu_show_window": "Show lyrics window",
+        "taskbar_mode": "Show lyrics on the taskbar",
+        "taskbar_hide_main": "Hide the big lyrics window while lyrics are on the taskbar "
+                             "(double-click the taskbar lyrics to reopen it)",
+        "taskbar_width": "Taskbar lyrics width (px)",
+        "pin_title": "Pin Lyric Spotify to the taskbar",
+        "pin_steps": "Windows does not let apps pin themselves. Two steps:\n\n"
+                     "1. Right-click the flashing Lyric Spotify icon on the taskbar.\n"
+                     "2. Choose \"Pin to taskbar\".\n\n"
+                     "Next time just click that icon to open the app.",
         "menu_quit": "Quit    Esc",
         "btn_close": "Close",
         "btn_more": "More options",

@@ -45,7 +45,8 @@ DEFAULTS = {"x": 120, "y": 120, "w": 520, "h": 400, "font": 17,
             "font_family": "Segoe UI", "bold": False,
             "ai_enabled": True, "ai_model": "large-v3-turbo",
             "ai_device": "", "ai_only_spotify": True, "ai_separate": True, "ui_lang": "vi",
-            "theme": "dark"}
+            "theme": "dark", "taskbar_mode": False, "taskbar_hide_main": True,
+            "taskbar_w": 460, "taskbar_offset": 0}
 APP_DIR = getattr(sys, "_MEIPASS", os.path.dirname(os.path.abspath(__file__)))  # tài nguyên (icon)
 # dữ liệu của người dùng (thư mục lời): cạnh file exe khi chạy bản đóng gói
 DATA_DIR = os.path.dirname(sys.executable) if getattr(sys, "frozen", False) else os.path.dirname(os.path.abspath(__file__))
@@ -496,6 +497,7 @@ class LyricsWindow:
         self.ai_events = queue.Queue()
         self.ai_status = None       # (key i18n, tham số)
         self.settings_win = None
+        self.taskbar = None         # dải lời trên thanh taskbar
         self.hide_job = None
         self.toast_job = None
         self.size = (self.cfg["w"], self.cfg["h"])
@@ -506,6 +508,8 @@ class LyricsWindow:
         self.relayout()
         self.root.after(80, self.show_in_taskbar)
         self.root.after(3000, self.watch_windows_theme)
+        if self.cfg["taskbar_mode"]:
+            self.root.after(300, lambda: self.set_taskbar_mode(True, save=False))
         self.tick()
 
     # ---- cửa sổ ---------------------------------------------------------- #
@@ -546,12 +550,17 @@ class LyricsWindow:
         self.glass_var = tk.BooleanVar(value=self.cfg["glass"])
         m = tk.Menu(self.root, tearoff=0)
         m.add_command(label=t("menu_settings"), command=self.open_settings)
+        self.taskbar_var = tk.BooleanVar(value=self.cfg["taskbar_mode"])
+        m.add_checkbutton(label=t("menu_taskbar"), variable=self.taskbar_var,
+                          command=lambda: self.set_taskbar_mode(self.taskbar_var.get()))
+        m.add_command(label=t("menu_show_window"), command=self.show_main_window)
         m.add_checkbutton(label=t("menu_glass"), variable=self.glass_var,
                           command=lambda: self.toggle_glass(self.glass_var.get()))
         m.add_separator()
         m.add_command(label=t("menu_edit"), command=self.edit_lyrics)
         m.add_command(label=t("menu_reload"), command=self.refetch)
         m.add_command(label=t("menu_folder"), command=self.open_lyrics_dir)
+        m.add_command(label=t("menu_pin"), command=self.pin_to_taskbar)
         m.add_separator()
         m.add_command(label=t("menu_quit"), command=self.quit)
         self.menu = m
@@ -744,6 +753,54 @@ class LyricsWindow:
             if self.cfg["ai_enabled"] and self.track:
                 self.start_ai()
 
+    def set_taskbar_mode(self, on, save=True):
+        """Bật/tắt lời trên thanh taskbar; khi bật có thể ẩn cửa sổ lời lớn."""
+        self.cfg["taskbar_mode"] = on
+        self.taskbar_var.set(on)
+        if on and not self.taskbar:
+            from taskbar_lyrics import TaskbarLyrics
+            self.taskbar = TaskbarLyrics(self)
+            if self.cfg["taskbar_hide_main"]:
+                self.root.withdraw()
+        elif not on and self.taskbar:
+            self.taskbar.destroy()
+            self.taskbar = None
+            self.show_main_window()
+        if save:
+            self.save_config()
+
+    def show_main_window(self):
+        self.root.deiconify()
+        self.root.lift()
+
+    def taskbar_text(self):
+        """(dòng đang hát, dòng kế tiếp) cho dải lời trên taskbar."""
+        tr = self.track
+        title = f"{tr['title']} — {tr['artist']}" if tr else "Lyric Spotify"
+        lines = (self.lyrics or {}).get("lines") or []
+        if lines and self.lyrics.get("kind") == "synced":
+            i = self.cur if self.cur is not None else -1
+            cur = lines[i][1] if i >= 0 else "♪ " + title
+            nxt = next((l for _, l in lines[i + 1:] if l.strip()), "")
+            return (cur or "♪"), nxt
+        if lines:  # lời thường (không có thời gian)
+            return "♪ " + title, ""
+        return "♪ " + title, self.message_text().splitlines()[0] if self.message_text() else ""
+
+    def pin_to_taskbar(self):
+        """Windows không cho app tự ghim -> nháy biểu tượng trên taskbar và hướng dẫn 2 bước."""
+        from tkinter import messagebox
+        try:
+            class FLASHWINFO(ctypes.Structure):
+                _fields_ = [("cbSize", ctypes.c_uint), ("hwnd", ctypes.c_void_p), ("dwFlags", ctypes.c_uint),
+                            ("uCount", ctypes.c_uint), ("dwTimeout", ctypes.c_uint)]
+            hwnd = ctypes.windll.user32.GetParent(self.root.winfo_id())
+            info = FLASHWINFO(ctypes.sizeof(FLASHWINFO), hwnd, 0x2, 6, 0)  # FLASHW_TRAY, 6 lần
+            ctypes.windll.user32.FlashWindowEx(ctypes.byref(info))
+        except Exception:  # noqa: BLE001
+            pass
+        messagebox.showinfo(t("pin_title"), t("pin_steps"), parent=self.root)
+
     def open_lyrics_dir(self):
         os.makedirs(LYRICS_DIR, exist_ok=True)
         os.startfile(LYRICS_DIR)
@@ -822,6 +879,8 @@ class LyricsWindow:
         subprocess.Popen(args, close_fds=True)
 
     def quit(self):
+        if self.taskbar:
+            self.taskbar.destroy()
         self.stop_ai()
         self.save_config()
         self.root.destroy()
@@ -1100,6 +1159,8 @@ class LyricsWindow:
     def tick(self):
         try:
             self.update_frame()
+            if self.taskbar:
+                self.taskbar.update(*self.taskbar_text())
         except Exception:  # noqa: BLE001 - ghi lỗi ra file thay vì làm treo app (pythonw không có console)
             log_exception()
         finally:

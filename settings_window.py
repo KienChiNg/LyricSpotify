@@ -82,6 +82,12 @@ class SettingsWindow:
         self.slider(t("alpha"), self.alpha, 15, 100, lambda: app.set_alpha(self.alpha.get() / 100))
         self.glass = tk.BooleanVar(value=cfg["glass"])
         self.check(t("glass"), self.glass, lambda: app.toggle_glass(self.glass.get()))
+        self.taskbar_on = tk.BooleanVar(value=cfg["taskbar_mode"])
+        self.check(t("taskbar_mode"), self.taskbar_on, lambda: app.set_taskbar_mode(self.taskbar_on.get()))
+        self.taskbar_hide = tk.BooleanVar(value=cfg["taskbar_hide_main"])
+        self.check(t("taskbar_hide_main"), self.taskbar_hide, self.on_taskbar_hide)
+        self.taskbar_w = tk.IntVar(value=cfg["taskbar_w"])
+        self.slider(t("taskbar_width"), self.taskbar_w, 240, 900, self.on_taskbar_width)
 
         # ---- Lời bài hát đã lưu ----
         self.section(t("sec_lyrics"))
@@ -286,6 +292,16 @@ class SettingsWindow:
             self.app.refetch()
 
     # ---- áp dụng ---------------------------------------------------------- #
+
+    def on_taskbar_hide(self):
+        self.app.cfg["taskbar_hide_main"] = self.taskbar_hide.get()
+        self.app.save_soon()
+
+    def on_taskbar_width(self):
+        self.app.cfg["taskbar_w"] = self.taskbar_w.get()
+        if self.app.taskbar:
+            self.app.taskbar.place()
+        self.app.save_soon()
 
     def on_font(self):
         self.app.set_text_style(self.font_size.get(), self.family.get(), self.bold.get())
