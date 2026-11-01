@@ -87,6 +87,11 @@ def model_downloaded(name):
         return False
 
 
+def ready(name):
+    """AI dùng được ngay: đã có thư viện VÀ mô hình (không tự tải gì trong lúc nghe nhạc)."""
+    return available() and model_downloaded(name)
+
+
 def get_model(name, status=None):
     with _model_lock:
         if _model["name"] != name:

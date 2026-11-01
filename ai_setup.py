@@ -17,24 +17,24 @@ from i18n import set_lang, t
 MODEL_REPO = "mobiuslabsgmbh/faster-whisper-large-v3-turbo"
 
 
-def model_cached():
-    """Mô hình mặc định đã có trong bộ nhớ đệm Hugging Face chưa (không cần import thư viện)."""
+def model_cached(repo=MODEL_REPO):
+    """Mô hình đã có trong bộ nhớ đệm Hugging Face chưa (không cần import thư viện)."""
     import glob
     import os
     hub = (os.environ.get("HF_HUB_CACHE")
            or os.path.join(os.environ.get("HF_HOME") or os.path.join(os.path.expanduser("~"), ".cache",
                                                                       "huggingface"), "hub"))
-    folder = os.path.join(hub, "models--" + MODEL_REPO.replace("/", "--"), "snapshots", "*", "model.bin")
+    folder = os.path.join(hub, "models--" + repo.replace("/", "--"), "snapshots", "*", "model.bin")
     return bool(glob.glob(folder))
 
 
-def prefetch_model(progress):
-    """Tải sẵn mô hình Whisper mặc định (~1.6 GB) vào bộ nhớ đệm Hugging Face."""
+def prefetch_model(progress, repo=MODEL_REPO):
+    """Tải sẵn mô hình Whisper (mặc định large-v3-turbo ~1.6 GB) vào bộ nhớ đệm Hugging Face."""
     ai_runtime.activate()
     importlib.invalidate_caches()
     from huggingface_hub import snapshot_download
     progress(t("setup_model"))
-    snapshot_download(MODEL_REPO)
+    snapshot_download(repo)
 
 
 def run(cfg, with_demucs):

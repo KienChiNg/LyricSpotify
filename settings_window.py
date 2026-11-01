@@ -1,6 +1,7 @@
 """Cửa sổ Cài đặt: ngôn ngữ, giao diện chữ, lời đã lưu, AI chép lời."""
 
 import os
+import sys
 import tkinter as tk
 from tkinter import font as tkfont
 from tkinter import messagebox, ttk
@@ -104,7 +105,8 @@ class SettingsWindow:
 
         # ---- AI chép lời ----
         self.section(t("sec_ai"))
-        if not transcriber.available() or not transcriber.separation_available():
+        if (not transcriber.available() or not transcriber.separation_available()
+                or not transcriber.model_downloaded(cfg["ai_model"])):
             self.install_box()
         self.ai_on = tk.BooleanVar(value=cfg["ai_enabled"])
         self.check(t("ai_enable"), self.ai_on, self.on_ai)
@@ -239,6 +241,11 @@ class SettingsWindow:
         import threading
         self.install_btn.configure(state="disabled", text=t("ai_installing"))
         with_demucs = self.with_demucs.get() or transcriber.available()
+        model = self.app.cfg["ai_model"]
+        need_libs = not ai_runtime.installed() or (with_demucs and not ai_runtime.demucs_installed())
+        if not getattr(sys, "frozen", False):  # chạy từ mã nguồn: thư viện đã có trong Python thì thôi
+            need_libs = need_libs and not (transcriber.available() and (not with_demucs or
+                                                                        transcriber.separation_available()))
 
         def progress(line):
             self.win.after(0, lambda: self.install_status.winfo_exists()
@@ -246,7 +253,10 @@ class SettingsWindow:
 
         def work():
             try:
-                ok = ai_runtime.install(with_demucs, progress)
+                ok = ai_runtime.install(with_demucs, progress) if need_libs else True
+                if ok and not transcriber.model_downloaded(model):  # tải luôn mô hình, khỏi tải ngầm lúc nghe
+                    import ai_setup
+                    ai_setup.prefetch_model(progress, transcriber.MODEL_REPOS[model])
             except Exception as e:  # noqa: BLE001
                 ok = False
                 progress(str(e))

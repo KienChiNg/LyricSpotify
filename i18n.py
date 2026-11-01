@@ -37,6 +37,7 @@ STRINGS = {
         "ad": "Quảng cáo…",
         "not_found": "Không tìm thấy lời cho bài này.\nChuột phải → Thêm / sửa lời để tự thêm.",
         "instrumental": "Nhạc không lời",
+        "not_found_ai_partial": "Không tìm thấy lời cho bài này.\nPhần AI chưa tải xong: Cài đặt → AI chép lời → Tải phần AI.",
         "busy": "Nguồn lời đang bận, tự thử lại sau 15 giây… ({n}/5)",
         "ai_fallback": "Không tìm thấy lời trên mạng.\nAI đang nghe bài hát và chép lời…",
         # AI
@@ -143,6 +144,7 @@ STRINGS = {
         "ad": "Advertisement…",
         "not_found": "No lyrics found for this song.\nRight-click → Add / edit lyrics to add your own.",
         "instrumental": "Instrumental",
+        "not_found_ai_partial": "No lyrics found for this song.\nThe AI add-on is incomplete: Settings → AI transcription → Download AI add-on.",
         "busy": "Lyrics servers are busy, retrying in 15 seconds… ({n}/5)",
         "ai_fallback": "No lyrics found online.\nAI is listening and transcribing…",
         "ai_preparing": "AI is getting ready…",

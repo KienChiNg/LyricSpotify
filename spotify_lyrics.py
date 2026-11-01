@@ -982,7 +982,7 @@ class LyricsWindow:
         threading.Thread(target=work, daemon=True).start()
 
     def start_ai(self):
-        if not transcriber.available():
+        if not transcriber.ready(self.cfg["ai_model"]):  # chưa tải đủ phần AI -> không tự tải
             return
         self.ai_gen += 1
         key, gen, q = self.track_key, self.ai_gen, self.ai_events
@@ -1305,9 +1305,13 @@ class LyricsWindow:
                     token = self.fetch_token
                     self.root.after(15000, lambda: self.start_fetch(self.track)
                                     if token == self.fetch_token and self.track else None)
-                if kind != "instrumental" and self.cfg["ai_enabled"] and transcriber.available():
+                if kind != "instrumental" and self.cfg["ai_enabled"] and transcriber.ready(self.cfg["ai_model"]):
                     if not self.ai:
                         self.start_ai()
+                    return
+                if kind == "none" and self.cfg["ai_enabled"] and transcriber.available():
+                    # có thư viện AI nhưng thiếu mô hình: báo để người dùng tự tải, không tải ngầm
+                    self.set_message("not_found_ai_partial")
                     return
                 if kind == "error":
                     self.set_message("busy", n=tries + 1)
