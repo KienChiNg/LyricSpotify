@@ -1,6 +1,6 @@
 # Lyric Spotify 🎶
 
-<img width="418" height="418" alt="Neon Spotify Lyrics Icon" src="https://github.com/user-attachments/assets/7437bd02-8591-4c95-a9a0-690ddf8e3878" />
+<img width="561" height="561" alt="icon" src="https://github.com/user-attachments/assets/00c61792-421d-4f66-82ca-38634598b543" />
 
 Cửa sổ nổi trên màn hình Windows hiển thị **lời bài hát chạy theo nhạc** của bài đang phát trên app Spotify.
 Không cần đăng nhập hay API key. Khi không tìm thấy lời, **AI có thể tự nghe và chép lời** (tuỳ chọn, cần card NVIDIA).
