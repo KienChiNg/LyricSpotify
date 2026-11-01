@@ -223,24 +223,36 @@ class TaskbarLyrics:
             self.place()
 
     def keep_on_top(self):
-        """Bấm vào taskbar sẽ đưa taskbar lên trên -> đẩy dải chữ lên lại; ẩn khi có app toàn màn hình."""
+        """Mỗi 0,1 giây: giữ dải chữ trên taskbar, tự hiện lại nếu bị ẩn ngoài ý muốn,
+        ẩn khi có app toàn màn hình trên cùng màn hình. Lỗi bất ngờ không làm dừng vòng lặp."""
         if not self.win.winfo_exists():
             return
-        full = fullscreen_app_active(self.bar["monitor"] if self.bar else None)
-        if full and not self.hidden:
-            self.win.withdraw()
-            self.hidden = True
-        elif not full:
-            if self.hidden:
-                self.win.deiconify()
-                self.hidden = False
-            self.raise_now()
-            self.place()
-            self.ticks += 1
-            if self.ticks % 10 == 1:  # mỗi giây: nền theo màu taskbar
-                self.match_taskbar_color()
-        # bấm vào taskbar (hoặc khe giữa các chữ) đưa taskbar lên trên -> đẩy dải chữ lên lại thật nhanh
-        self.win.after(100, self.keep_on_top)
+        try:
+            full = fullscreen_app_active(self.bar["monitor"] if self.bar else None)
+            hwnd = user32.GetParent(self.win.winfo_id())
+            if full and not self.hidden:
+                self.win.withdraw()
+                self.hidden = True
+            elif not full:
+                if self.hidden:
+                    self.win.deiconify()
+                    self.hidden = False
+                elif hwnd and not user32.IsWindowVisible(hwnd):
+                    user32.ShowWindow(hwnd, 8)  # bị ẩn ngoài ý muốn (Windows/app khác) -> hiện lại (SW_SHOWNA)
+                self.raise_now()
+                self.place()
+                self.ticks += 1
+                if self.ticks % 10 == 1:  # mỗi giây: nền theo màu taskbar
+                    self.match_taskbar_color()
+        except Exception:  # noqa: BLE001
+            try:
+                from spotify_lyrics import log_exception
+                log_exception()
+            except Exception:  # noqa: BLE001
+                pass
+        finally:
+            # bấm vào taskbar (hoặc khe giữa các chữ) đưa taskbar lên trên -> đẩy dải chữ lên lại thật nhanh
+            self.win.after(100, self.keep_on_top)
 
     def match_taskbar_color(self):
         """Tô nền dải chữ đúng màu taskbar (đọc ở khe giữa dải chữ và khu đồng hồ).
