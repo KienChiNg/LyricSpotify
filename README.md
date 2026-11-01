@@ -21,9 +21,9 @@ No Spotify login or API key needed. When no lyrics can be found, an optional **A
 - Add or fix lyrics yourself (right-click → *Add / edit lyrics*), saved as `.lrc` / `.txt` files.
 - **AI transcription** (optional): Whisper large-v3-turbo on the GPU with Demucs vocal separation; lyrics appear as the song plays and are saved once the whole song has been heard.
 
-| Lyrics window | Light theme | Settings |
+| Lyrics window | Light theme | Transparent mode |
 |---|---|---|
-| <img src="docs/window.png" width="260" alt="Lyrics window"> | <img src="docs/light.png" width="260" alt="Light theme"> | <img src="docs/settings.png" width="230" alt="Settings window"> |
+| <img src="docs/window.png" width="260" alt="Lyrics window"> | <img src="docs/light.png" width="260" alt="Light theme"> | <img src="docs/transparent.png" width="260" alt="Transparent background, text only"> |
 
 **Lyrics on the taskbar**
 
